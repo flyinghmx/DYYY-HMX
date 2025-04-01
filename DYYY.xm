@@ -870,19 +870,7 @@
     BOOL shouldFilterKeywords = NO;
     
     BOOL shouldFilterTime = NO;
-    long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
-    NSInteger daysThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfiltertimelimit"];
-    if (daysThreshold > 0) {
-        NSTimeInterval videoTimestamp = [self.createTime doubleValue]; 
-        if (videoTimestamp > 0) {
-            NSTimeInterval threshold = daysThreshold * 86400.0; 
-            NSTimeInterval current = (NSTimeInterval)currentTimestamp; 
-            NSTimeInterval timeDifference = current - videoTimestamp;
-            shouldFilterTime = (timeDifference > threshold);
-        }
-    }
 
-    
     // 获取用户设置的需要过滤的关键词
     NSString *filterKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterKeywords"];
     NSArray *keywordsList = nil;
@@ -936,8 +924,20 @@
                 }
             }
         }
+        
+        // 过滤视频发布时间
+        long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
+        NSInteger daysThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfiltertimelimit"];
+        if (daysThreshold > 0) {
+            NSTimeInterval videoTimestamp = [self.createTime doubleValue]; 
+            if (videoTimestamp > 0) {
+                NSTimeInterval threshold = daysThreshold * 86400.0; 
+                NSTimeInterval current = (NSTimeInterval)currentTimestamp; 
+                NSTimeInterval timeDifference = current - videoTimestamp;
+                shouldFilterTime = (timeDifference > threshold);
+            }
+        }
     }
-    
     return (shouldFilterAds || shouldFilterRec || shouldFilterHotSpot || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterTime) ? nil : orig;
 }
 
@@ -956,18 +956,6 @@
     BOOL shouldFilterKeywords = NO;
 
     BOOL shouldFilterTime = NO;
-    long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
-    NSInteger daysThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfiltertimelimit"];
-    if (daysThreshold > 0) {
-        NSTimeInterval videoTimestamp = [self.createTime doubleValue]; 
-        if (videoTimestamp > 0) {
-            NSTimeInterval threshold = daysThreshold * 86400.0; 
-            NSTimeInterval current = (NSTimeInterval)currentTimestamp; 
-            NSTimeInterval timeDifference = current - videoTimestamp;
-            shouldFilterTime = (timeDifference > threshold);
-        }
-    }
-
     
     // 获取用户设置的需要过滤的关键词
     NSString *filterKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterKeywords"];
@@ -979,7 +967,7 @@
     
     NSInteger filterLowLikesThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfilterLowLikes"];
         
-    // 只有当shareRecExtra不为空时才过滤点赞量低的视频和关键词
+    // 只有当shareRecExtra不为空时才过滤
     if (self.shareRecExtra && ![self.shareRecExtra isEqual:@""]) {
         // 过滤低点赞量视频
         if (filterLowLikesThreshold > 0) {
@@ -1020,6 +1008,19 @@
                         if (shouldFilterKeywords) break;
                     }
                 }
+            }
+        }
+        
+        // 过滤视频发布时间
+        long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
+        NSInteger daysThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfiltertimelimit"];
+        if (daysThreshold > 0) {
+            NSTimeInterval videoTimestamp = [self.createTime doubleValue]; 
+            if (videoTimestamp > 0) {
+                NSTimeInterval threshold = daysThreshold * 86400.0; 
+                NSTimeInterval current = (NSTimeInterval)currentTimestamp; 
+                NSTimeInterval timeDifference = current - videoTimestamp;
+                shouldFilterTime = (timeDifference > threshold);
             }
         }
     }
@@ -2028,6 +2029,32 @@
      return r;
  }
  
+%end
+
+%hook AWEFeedModuleService
+ 
+- (BOOL)getFeedIphoneAutoPlayState {
+      BOOL r = %orig;
+      
+      if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAutoPlay"]) {
+          return YES;
+      }
+      return %orig;
+  }
+%end
+
+%hook AWEFeedGuideManager
+
+- (bool)enableAutoplay {
+
+    BOOL featureEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAutoPlay"];
+    
+    if (!featureEnabled) {
+
+        return %orig;
+    }
+    return YES;
+}
 %end
 
 %hook AWEFeedChannelManager
@@ -3261,19 +3288,31 @@ static BOOL isDownloadFlied = NO;
 %end
 
 //隐藏关注直播
-%hook AWEConcernSkylightCapsuleView 
+%hook AWEConcernSkylightCapsuleView
 - (void)setHidden:(BOOL)hidden {
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideConcernCapsuleView"]) {
-        hidden = YES;
+        [self removeFromSuperview];
+        return;
     }
+    
     %orig(hidden);
 }
+%end
+
+//隐藏直播发现
+%hook AWEFeedLiveTabRevisitControlView 
  
 - (void)layoutSubviews {
     %orig;
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideConcernCapsuleView"]) {
+    
+    // 判断是否需要隐藏 
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideLiveDiscovery"]) {
+        // 如果需要隐藏，则移除或隐藏视图
+        if ([self respondsToSelector:@selector(removeFromSuperview)]) {
+            [self removeFromSuperview];
+        }
         self.hidden = YES;
-        self.alpha = 0;
+        return;
     }
 }
 %end
@@ -3701,7 +3740,7 @@ static BOOL isDownloadFlied = NO;
 
 - (void)layoutSubviews {
     %orig; 
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"Hidenote"]) {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideItemTag"]) {
         self.frame = CGRectMake(0, 0, 0, 0);
         self.hidden = YES;
     }
@@ -3804,16 +3843,11 @@ static BOOL isDownloadFlied = NO;
 //隐藏首页直播胶囊
 %hook AWEHPTopTabItemBadgeContentView
 
-- (void)updateSmallRedDotLayout {
-    %orig;
-    
+- (void)layoutSubviews {
+    %orig; 
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideLiveCapsuleView"]) {
-        UIView *parentView = self.superview; // 现在可以正确访问
-        if (parentView) {
-            parentView.hidden = YES;
-        } else {
-            self.hidden = YES;
-        }
+        self.frame = CGRectMake(0, 0, 0, 0);
+        self.hidden = YES;
     }
 }
 
@@ -3926,23 +3960,28 @@ static BOOL isDownloadFlied = NO;
 //隐藏礼物展馆
 %hook WKScrollView
 - (void)layoutSubviews {
-    %orig;
+    %orig; 
     
-    UIResponder *responder = self;
-    while (responder) {
-        NSString *className = NSStringFromClass([responder class]);
-        if ([className isEqualToString:@"BDPAppPageController"] || [className isEqualToString:@"BDPStarkController"]) {
-            return; //排除小程序和游戏的影响
-        }
-        responder = responder.nextResponder;
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideGiftPavilion"]) {
+        return;
     }
-
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideGiftPavilion"]) {
-        self.hidden = YES;
+    
+    UIView *superview = self.superview;
+    if (![superview isKindOfClass:NSClassFromString(@"WDXWebView")]) {
+        return; 
+    }
+    
+    NSString *title = [(id)superview title];
+    
+    // 如果 title 包含任务banner或 活动banner，就移除
+    if (title && (
+        [title rangeOfString:@"任务Banner"].location != NSNotFound ||
+        [title rangeOfString:@"活动Banner"].location != NSNotFound
+    )) {
+        [self removeFromSuperview]; 
     }
 }
-
-%end
+%end    
 
 %hook IESLiveActivityBannnerView
 - (void)layoutSubviews {
