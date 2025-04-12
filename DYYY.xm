@@ -13,7 +13,7 @@
 #import <objc/runtime.h>
 
 #define DYYY @"DYYY"
-#define tweakVersion @"2.2-2"
+#define tweakVersion @"2.2-3"
 
 @interface DYYYManager (API)
 + (void)parseAndDownloadVideoWithShareLink:(NSString *)shareLink apiKey:(NSString *)apiKey;
@@ -683,9 +683,7 @@ static void DYYYAddCustomViewToParent(UIView *parentView, float transparency) {
 				if (isWorkImage) {
 					// 修复作者主页作品图片上移问题
 					CGRect frame = subview.frame;
-					// 这里可以根据需要调整位置
-					// 例如，如果图片上移了，可以将其下移
-					frame.origin.y += 83; // 假设需要下移83像素
+					frame.origin.y += 83;
 					subview.frame = frame;
 				}
 			}
@@ -733,7 +731,11 @@ static void DYYYAddCustomViewToParent(UIView *parentView, float transparency) {
 
 	UIViewController *vc = [self firstAvailableUIViewController];
 	if ([vc isKindOfClass:%c(AWEAwemePlayVideoViewController)]) {
-		if (frame.origin.x != 0 || frame.origin.y != 0) {
+
+		if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] && frame.origin.x != 0) {
+			return;
+		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"] && frame.origin.x != 0 && frame.origin.y != 0) {
+			%orig;
 			return;
 		} else {
 			CGRect superviewFrame = self.superview.frame;
@@ -1611,7 +1613,11 @@ static void DYYYAddCustomViewToParent(UIView *parentView, float transparency) {
 							    ([cityCode hasPrefix:@"11"] || [cityCode hasPrefix:@"12"] || [cityCode hasPrefix:@"31"] || [cityCode hasPrefix:@"50"]);
 
 					BOOL containsProvince = [text containsString:provinceName];
-
+					if (containsProvince && !isDirectCity) {
+						label.text = [NSString stringWithFormat:@"%@ %@", text, cityName];
+					} else if (containsProvince && isDirectCity) {
+						label.text = [NSString stringWithFormat:@"%@  IP属地：%@", text, cityName];
+					} else
 					if (isDirectCity && containsProvince) {
 						label.text = text;
 					} else if (containsProvince) {
