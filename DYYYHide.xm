@@ -247,22 +247,10 @@
 // 隐藏大家都在搜
 %hook AWESearchAnchorListModel
 
-- (void)setHideWords:(BOOL)arg1 {
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideCommentViews"]) {
-		%orig(YES);
-	} else {
-		%orig(arg1);
-	}
+- (BOOL)hideWords {
+  return [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideCommentViews"];
 }
 
-- (void)setScene:(id)arg1 {
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideCommentViews"]) {
-		NSDictionary *customScene = @{@"hideComments" : @YES};
-		%orig(customScene);
-	} else {
-		%orig(arg1);
-	}
-}
 %end
 
 // 隐藏观看历史搜索
@@ -590,74 +578,141 @@
 %hook AWENormalModeTabBar
 
 - (void)layoutSubviews {
-	%orig;
+    %orig;
+
+    BOOL hideShop = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideShopButton"];
+    BOOL hideMsg = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideMessageButton"];
+    BOOL hideFri = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideFriendsButton"];
+    BOOL hideMe = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideMyButton"];
+
+    NSMutableArray *visibleButtons = [NSMutableArray array];
+    Class generalButtonClass = %c(AWENormalModeTabBarGeneralButton);
+    Class plusButtonClass = %c(AWENormalModeTabBarGeneralPlusButton);
+
+    for (UIView *subview in self.subviews) {
+        if (![subview isKindOfClass:generalButtonClass] && ![subview isKindOfClass:plusButtonClass])
+            continue;
+
+        NSString *label = subview.accessibilityLabel;
+        BOOL shouldHide = NO;
+
+        if ([label isEqualToString:@"商城"]) {
+            shouldHide = hideShop;
+        } else if ([label containsString:@"消息"]) {
+            shouldHide = hideMsg;
+        } else if ([label containsString:@"朋友"]) {
+            shouldHide = hideFri;
+        } else if ([label containsString:@"我"]) {
+            shouldHide = hideMe;
+        }
+
+        if (!shouldHide) {
+            [visibleButtons addObject:subview];
+        } else {
+            [subview removeFromSuperview];
+        }
+    }
+
+    [visibleButtons sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
+      return [@(a.frame.origin.x) compare:@(b.frame.origin.x)];
+    }];
+
+    if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+        // iPad端布局逻辑
+        UIView *targetView = nil;
+        CGFloat containerWidth = self.bounds.size.width;
+        CGFloat offsetX = 0;
+
+        // 查找目标容器视图
+        for (UIView *subview in self.subviews) {
+            if ([subview class] == [UIView class] && fabs(subview.frame.size.width - self.bounds.size.width) > 0.1) {
+                targetView = subview;
+                containerWidth = subview.frame.size.width;
+                offsetX = subview.frame.origin.x;
+                break;
+            }
+        }
+
+        // 在目标容器内均匀分布按钮
+        CGFloat buttonWidth = containerWidth / visibleButtons.count;
+        for (NSInteger i = 0; i < visibleButtons.count; i++) {
+            UIView *button = visibleButtons[i];
+            button.frame = CGRectMake(offsetX + (i * buttonWidth), button.frame.origin.y, buttonWidth, button.frame.size.height);
+        }
+    } else {
+        // iPhone端布局逻辑
+        CGFloat totalWidth = self.bounds.size.width;
+        CGFloat buttonWidth = totalWidth / visibleButtons.count;
+
+        for (NSInteger i = 0; i < visibleButtons.count; i++) {
+            UIView *button = visibleButtons[i];
+            button.frame = CGRectMake(i * buttonWidth, button.frame.origin.y, buttonWidth, button.frame.size.height);
+        }
+    }
+}
+
+- (void)setHidden:(BOOL)hidden {
+	%orig(hidden);
 
 	BOOL hideShop = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideShopButton"];
 	BOOL hideMsg = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideMessageButton"];
 	BOOL hideFri = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideFriendsButton"];
 
 	NSMutableArray *visibleButtons = [NSMutableArray array];
+	NSMutableArray *buttonTypes = [NSMutableArray array];
 	Class generalButtonClass = %c(AWENormalModeTabBarGeneralButton);
 	Class plusButtonClass = %c(AWENormalModeTabBarGeneralPlusButton);
 
+	// 收集所有可见按钮并记录它们的类型
 	for (UIView *subview in self.subviews) {
 		if (![subview isKindOfClass:generalButtonClass] && ![subview isKindOfClass:plusButtonClass])
 			continue;
 
 		NSString *label = subview.accessibilityLabel;
 		BOOL shouldHide = NO;
+		NSString *buttonType = @"unknown";
 
-		if ([label isEqualToString:@"商城"]) {
+		if ([label isEqualToString:@"首页"]) {
+			buttonType = @"home";
+		} else if ([label isEqualToString:@"商城"]) {
 			shouldHide = hideShop;
+			buttonType = @"shop";
 		} else if ([label containsString:@"消息"]) {
 			shouldHide = hideMsg;
+			buttonType = @"message";
 		} else if ([label containsString:@"朋友"]) {
 			shouldHide = hideFri;
+			buttonType = @"friends";
+		} else if ([label isEqualToString:@"我"]) {
+			buttonType = @"profile";
 		}
 
 		if (!shouldHide) {
 			[visibleButtons addObject:subview];
+			[buttonTypes addObject:buttonType];
 		} else {
 			[subview removeFromSuperview];
 		}
 	}
 
-	[visibleButtons sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
-	  return [@(a.frame.origin.x) compare:@(b.frame.origin.x)];
+	// 按照x坐标排序按钮
+	NSMutableArray *pairedObjects = [NSMutableArray array];
+	for (NSInteger i = 0; i < visibleButtons.count; i++) {
+		[pairedObjects addObject:@{@"button" : visibleButtons[i], @"type" : buttonTypes[i], @"x" : @(((UIView *)visibleButtons[i]).frame.origin.x)}];
+	}
+
+	[pairedObjects sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+	  return [a[@"x"] compare:b[@"x"]];
 	}];
 
-	if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
-		// iPad端布局逻辑
-		UIView *targetView = nil;
-		CGFloat containerWidth = self.bounds.size.width;
-		CGFloat offsetX = 0;
-
-		// 查找目标容器视图
-		for (UIView *subview in self.subviews) {
-			if ([subview class] == [UIView class] && fabs(subview.frame.size.width - self.bounds.size.width) > 0.1) {
-				targetView = subview;
-				containerWidth = subview.frame.size.width;
-				offsetX = subview.frame.origin.x;
-				break;
-			}
-		}
-
-		// 在目标容器内均匀分布按钮
-		CGFloat buttonWidth = containerWidth / visibleButtons.count;
-		for (NSInteger i = 0; i < visibleButtons.count; i++) {
-			UIView *button = visibleButtons[i];
-			button.frame = CGRectMake(offsetX + (i * buttonWidth), button.frame.origin.y, buttonWidth, button.frame.size.height);
-		}
-	} else {
-		// iPhone端布局逻辑
-		CGFloat totalWidth = self.bounds.size.width;
-		CGFloat buttonWidth = totalWidth / visibleButtons.count;
-
-		for (NSInteger i = 0; i < visibleButtons.count; i++) {
-			UIView *button = visibleButtons[i];
-			button.frame = CGRectMake(i * buttonWidth, button.frame.origin.y, buttonWidth, button.frame.size.height);
-		}
+	// 更新排序后的数组
+	[visibleButtons removeAllObjects];
+	[buttonTypes removeAllObjects];
+	for (NSDictionary *pair in pairedObjects) {
+		[visibleButtons addObject:pair[@"button"]];
+		[buttonTypes addObject:pair[@"type"]];
 	}
+
 
 	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisHiddenBottomBg"] || [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
 		for (UIView *subview in self.subviews) {
@@ -671,15 +726,25 @@
 				}
 
 				if (hasImageView) {
-					if (self.yy_viewController.selectedIndex == 0) {
-						subview.hidden = YES;
-					} else {
-						subview.hidden = NO;
+					// 默认隐藏背景
+					BOOL shouldShowBackground = NO;
+
+					// 获取当前选中的索引
+					NSInteger selectedIndex = self.yy_viewController.selectedIndex;
+					// 如果索引有效，检查当前选中的是什么类型的按钮
+					if (selectedIndex >= 0 && selectedIndex < buttonTypes.count) {
+						NSString *selectedType = buttonTypes[selectedIndex];
+
+						if ([selectedType isEqualToString:@"message"] || [selectedType isEqualToString:@"profile"]) {
+							shouldShowBackground = YES;
+						} 
 					}
+					subview.hidden = !shouldShowBackground;
 					break;
 				}
 			}
 		}
+	} else {
 	}
 }
 
@@ -1198,7 +1263,7 @@
 	%orig;
 	for (UIView *subview in self.subviews) {
 		if ([subview isKindOfClass:[%c(DUXBadge) class]]) {
-				if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisHiddenSidebarDot"]) {
+			if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisHiddenSidebarDot"]) {
 				subview.hidden = YES;
 			}
 		}
@@ -1209,11 +1274,11 @@
 %hook AWELeftSideBarEntranceView
 
 - (void)setRedDot:(id)redDot {
-    %orig(nil); 
+	%orig(nil);
 }
 
 - (void)setNumericalRedDot:(id)numericalRedDot {
-    %orig(nil); 
+	%orig(nil);
 }
 
 %end
@@ -1359,11 +1424,26 @@
 // 强制启用新版抖音长按 UI（现代风）
 %hook AWELongPressPanelManager
 - (BOOL)shouldShowModernLongPressPanel {
-	// 从 NSUserDefaults 读取开关状态
-	BOOL isEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableModern"];
-	return isEnabled; // 根据开关状态返回值
+	return DYYYGetBool(@"DYYYisEnableModern");
 }
+%end
 
+%hook AWELongPressPanelDataManager
++ (BOOL)enableModernLongPressPanelConfigWithSceneIdentifier:(id)arg1 {
+	return DYYYGetBool(@"DYYYisEnableModern");
+}
+%end
+
+%hook AWELongPressPanelABSettings
++ (NSUInteger)modernLongPressPanelStyleMode {
+	return DYYYGetBool(@"DYYYisEnableModern") ? 1 : 0;
+}
+%end
+
+%hook AWEModernLongPressPanelUIConfig
++ (NSUInteger)modernLongPressPanelStyleMode {
+	return DYYYGetBool(@"DYYYisEnableModern") ? 1 : 0;
+}
 %end
 
 // 聊天视频底部评论框背景透明
@@ -1395,4 +1475,3 @@
 		%init;
 	}
 }
-
