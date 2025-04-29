@@ -746,6 +746,35 @@
 		}
 	} else {
 	}
+// 隐藏分隔虾线
+	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
+				for (UIView *subview in self.subviews) {
+					if (![subview isKindOfClass:[UIView class]]) continue;
+					if (subview.frame.size.height <= 0.5 && subview.frame.size.width > 300) {
+						subview.hidden = YES;
+						CGRect frame = subview.frame;
+						frame.size.height = 0;
+						subview.frame = frame;
+						subview.alpha = 0;
+					}
+				}
+			}
+// 隐藏分割虾线结束
+}
+
+%end
+
+// 隐藏双指缩放虾线
+%hook AWELoadingAndVolumeView
+
+- (void)layoutSubviews {
+	%orig;
+
+	if ([self respondsToSelector:@selector(removeFromSuperview)]) {
+		[self removeFromSuperview];
+	}
+	self.hidden = YES;
+	return;
 }
 
 %end
@@ -1466,6 +1495,156 @@
 			parentView = parentView.superview;
 		}
 	}
+}
+
+%end
+
+// 移除极速版我的片面红包横幅
+%hook AWELuckyCatBannerView
+- (id)initWithFrame:(CGRect)frame {
+		return nil;
+	}
+
+- (id)init {
+		return nil;
+}
+%end
+
+// 极速版红包激励挂件容器视图类组（移除逻辑）
+%group IncentivePendantGroup
+%hook AWEIncentiveSwiftImplDOUYINLite_IncentivePendantContainerView
+- (void)layoutSubviews {
+	%orig;
+	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHidePendantGroup"]) {
+		[self removeFromSuperview]; // 移除视图
+	}
+}
+%end
+%end
+
+// Swift 红包类初始化
+%ctor {
+
+	// 初始化红包激励挂件容器视图类组
+	Class incentivePendantClass = objc_getClass("AWEIncentiveSwiftImplDOUYINLite.IncentivePendantContainerView");
+	if (incentivePendantClass) {
+		%init(IncentivePendantGroup, AWEIncentiveSwiftImplDOUYINLite_IncentivePendantContainerView = incentivePendantClass);
+	}
+}
+
+//隐藏搜索/他人主页底部评论框
+%hook AWECommentInputBackgroundView
+ 
+ - (void)layoutSubviews {
+      %orig; 
+ 
+      if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideSearchCommentBg"]) {
+          UIViewController *controller = nil;
+          UIResponder *responder = self.nextResponder;
+          while (responder) {
+              if ([responder isKindOfClass:[UIViewController class]]) {
+                  controller = (UIViewController *)responder;
+                  break;
+              }
+              responder = responder.nextResponder;
+          }
+ 
+          if ([controller isKindOfClass:NSClassFromString(@"AWECommentInputViewController")]) {
+              NSString *enterFrom = [controller valueForKey:@"enterFrom"];
+ 
+              if ([enterFrom isEqualToString:@"general_search"]) {
+                  // 搜索场景,直接移除视图
+                  [self removeFromSuperview];
+              } 
+              else if ([enterFrom isEqualToString:@"postwork_list"]) {
+                  [self removeFromSuperview];
+                  UIView *parentView = self.superview;
+                  if (parentView) {
+                      dispatch_async(dispatch_get_main_queue(), ^{
+                          // 父视图透明设置
+                          parentView.backgroundColor = [UIColor clearColor];
+ 
+                          // 定义深度优先搜索查找 _UIVisualEffectSubview 的 block
+                          void (^findVisualEffectSubviews)(UIView *) = ^void(UIView *view) {
+                              // 检查当前视图是否是目标类型
+                              if ([NSStringFromClass([view class]) isEqualToString:@"_UIVisualEffectSubview"]) {
+                                  view.backgroundColor = [UIColor clearColor];
+                                  view.layer.backgroundColor = [UIColor clearColor].CGColor;
+                                  view.opaque = NO;
+                              }
+ 
+                              // 递归处理子视图
+                              for (UIView *subview in view.subviews) {
+                                  findVisualEffectSubviews(subview);
+                              }
+                          };
+ 
+                          // 从父视图开始深度优先搜索
+                          findVisualEffectSubviews(parentView);
+                      });
+                  }
+              }
+          }
+      }
+}
+ 
+%end
+
+%hook AWEFeedChannelManager
+
+- (void)reloadChannelWithChannelModels:(id)arg1 currentChannelIDList:(id)arg2 reloadType:(id)arg3 selectedChannelID:(id)arg4 {
+	NSArray *channelModels = arg1;
+	NSMutableArray *newChannelModels = [NSMutableArray array];
+	NSArray *currentChannelIDList = arg2;
+	NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+
+	NSMutableArray *newCurrentChannelIDList = [NSMutableArray arrayWithArray:currentChannelIDList];
+
+	for (AWEHPTopTabItemModel *tabItemModel in channelModels) {
+		NSString *channelID = tabItemModel.channelID;
+
+		if ([channelID isEqualToString:@"homepage_hot_container"]) {
+			[newChannelModels addObject:tabItemModel];
+			continue;
+		}
+
+		BOOL isHideChannel = NO;
+		if ([channelID isEqualToString:@"homepage_follow"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHideFollow"];
+		} else if ([channelID isEqualToString:@"homepage_mediumvideo"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHideMediumVideo"];
+		} else if ([channelID isEqualToString:@"homepage_mall"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHideMall"];
+		} else if ([channelID isEqualToString:@"homepage_nearby"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHideNearby"];
+		} else if ([channelID isEqualToString:@"homepage_groupon"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHideGroupon"];
+		} else if ([channelID isEqualToString:@"homepage_tablive"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHideTabLive"];
+		} else if ([channelID isEqualToString:@"homepage_pad_hot"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHidePadHot"];
+		} else if ([channelID isEqualToString:@"homepage_hangout"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHideHangout"];
+		} else if ([channelID isEqualToString:@"homepage_familiar"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHideFriend"];
+		} else if ([channelID isEqualToString:@"homepage_playlet_stream"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHidePlaylet"];
+		} else if ([channelID isEqualToString:@"homepage_pad_cinema"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHideCinema"];
+		} else if ([channelID isEqualToString:@"homepage_pad_kids_v2"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHideKidsV2"];
+		} else if ([channelID isEqualToString:@"homepage_pad_game"]) {
+			isHideChannel = [defaults boolForKey:@"DYYYHideGame"];
+		}
+
+		if (!isHideChannel) {
+			[newChannelModels addObject:tabItemModel];
+		} else {
+			[newCurrentChannelIDList removeObject:channelID];
+		}
+	}
+
+	%orig(newChannelModels, newCurrentChannelIDList, arg3, arg4);
 }
 
 %end
