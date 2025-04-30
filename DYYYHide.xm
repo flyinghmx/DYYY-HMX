@@ -1532,64 +1532,6 @@
 	}
 }
 
-//隐藏搜索/他人主页底部评论框
-%hook AWECommentInputBackgroundView
- 
- - (void)layoutSubviews {
-      %orig; 
- 
-      if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideSearchCommentBg"]) {
-          UIViewController *controller = nil;
-          UIResponder *responder = self.nextResponder;
-          while (responder) {
-              if ([responder isKindOfClass:[UIViewController class]]) {
-                  controller = (UIViewController *)responder;
-                  break;
-              }
-              responder = responder.nextResponder;
-          }
- 
-          if ([controller isKindOfClass:NSClassFromString(@"AWECommentInputViewController")]) {
-              NSString *enterFrom = [controller valueForKey:@"enterFrom"];
- 
-              if ([enterFrom isEqualToString:@"general_search"]) {
-                  // 搜索场景,直接移除视图
-                  [self removeFromSuperview];
-              } 
-              else if ([enterFrom isEqualToString:@"postwork_list"]) {
-                  [self removeFromSuperview];
-                  UIView *parentView = self.superview;
-                  if (parentView) {
-                      dispatch_async(dispatch_get_main_queue(), ^{
-                          // 父视图透明设置
-                          parentView.backgroundColor = [UIColor clearColor];
- 
-                          // 定义深度优先搜索查找 _UIVisualEffectSubview 的 block
-                          void (^findVisualEffectSubviews)(UIView *) = ^void(UIView *view) {
-                              // 检查当前视图是否是目标类型
-                              if ([NSStringFromClass([view class]) isEqualToString:@"_UIVisualEffectSubview"]) {
-                                  view.backgroundColor = [UIColor clearColor];
-                                  view.layer.backgroundColor = [UIColor clearColor].CGColor;
-                                  view.opaque = NO;
-                              }
- 
-                              // 递归处理子视图
-                              for (UIView *subview in view.subviews) {
-                                  findVisualEffectSubviews(subview);
-                              }
-                          };
- 
-                          // 从父视图开始深度优先搜索
-                          findVisualEffectSubviews(parentView);
-                      });
-                  }
-              }
-          }
-      }
-}
- 
-%end
-
 %hook AWEFeedChannelManager
 
 - (void)reloadChannelWithChannelModels:(id)arg1 currentChannelIDList:(id)arg2 reloadType:(id)arg3 selectedChannelID:(id)arg4 {
@@ -1653,4 +1595,49 @@
 	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYUserAgreementAccepted"]) {
 		%init;
 	}
+}
+
+//隐藏键盘ai
+// 隐藏父视图的子视图
+static void hideParentViewsSubviews(UIView *view) {
+    if (!view) return;
+    // 获取第一层父视图
+    UIView *parentView = [view superview];
+    if (!parentView) return;
+    // 获取第二层父视图
+    UIView *grandParentView = [parentView superview];
+    if (!grandParentView) return;
+    // 获取第三层父视图
+    UIView *greatGrandParentView = [grandParentView superview];
+    if (!greatGrandParentView) return;
+    // 隐藏所有子视图
+    for (UIView *subview in greatGrandParentView.subviews) {
+        subview.hidden = YES;
+    }
+}
+// 递归查找目标视图
+static void findTargetViewInView(UIView *view) {
+    if ([view isKindOfClass:NSClassFromString(@"AWESearchKeyboardVoiceSearchEntranceView")]) {
+        hideParentViewsSubviews(view);
+        return;
+    }
+    for (UIView *subview in view.subviews) {
+        findTargetViewInView(subview);
+    }
+}
+// 构造函数
+%ctor {
+    // 注册键盘通知
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardWillShowNotification
+                                                    object:nil
+                                                     queue:[NSOperationQueue mainQueue]
+                                                usingBlock:^(NSNotification *notification) {
+        // 检查开关状态
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHidekeyboardai"]) {
+            // 执行查找隐藏
+            for (UIWindow *window in [UIApplication sharedApplication].windows) {
+                findTargetViewInView(window);
+            }
+        }
+    }];
 }

@@ -1,8 +1,12 @@
 #import "AwemeHeaders.h"
-#import "DYYYManager.h"
-#import "DYYYKeywordListView.h"
-#import "DYYYFilterSettingsView.h"
 #import "DYYYBottomAlertView.h"
+#import "DYYYFilterSettingsView.h"
+#import "DYYYKeywordListView.h"
+#import "DYYYManager.h"
+
+%hook AWELongPressPanelViewGroupModel
+%property(nonatomic, assign) BOOL isDYYYCustomGroup;
+%end
 
 %hook AWEModernLongPressPanelTableViewController
 
@@ -18,9 +22,9 @@
 	}
 
 	AWELongPressPanelViewGroupModel *newGroupModel = [[%c(AWELongPressPanelViewGroupModel) alloc] init];
-	[newGroupModel setIsDYYYCustomGroup:YES];
-    newGroupModel.groupType = 12;
-    newGroupModel.isModern = YES;
+	newGroupModel.isDYYYCustomGroup = YES;
+	newGroupModel.groupType = 12;
+	newGroupModel.isModern = YES;
 
 	NSMutableArray *viewModels = [NSMutableArray array];
 
@@ -235,7 +239,7 @@
 		copyShareLink.awemeModel = self.awemeModel;
 		copyShareLink.actionType = 672;
 		copyShareLink.duxIconName = @"ic_share_outlined";
-		copyShareLink.describeString = @"复制分享链接";
+		copyShareLink.describeString = @"复制链接";
 
 		copyShareLink.action = ^{
 		  NSString *shareLink = [self.awemeModel valueForKey:@"shareURL"];
@@ -256,7 +260,7 @@
 		apiDownload.awemeModel = self.awemeModel;
 		apiDownload.actionType = 673;
 		apiDownload.duxIconName = @"ic_cloudarrowdown_outlined_20";
-		apiDownload.describeString = @"接口保存视频";
+		apiDownload.describeString = @"接口保存";
 
 		apiDownload.action = ^{
 		  NSString *shareLink = [self.awemeModel valueForKey:@"shareURL"];
@@ -280,7 +284,7 @@
 		filterKeywords.awemeModel = self.awemeModel;
 		filterKeywords.actionType = 674;
 		filterKeywords.duxIconName = @"ic_userban_outlined_20";
-		filterKeywords.describeString = @"过滤用户视频";
+		filterKeywords.describeString = @"过滤用户";
 
 		filterKeywords.action = ^{
 		  // 获取当前视频作者信息
@@ -371,7 +375,7 @@
 		filterKeywords.awemeModel = self.awemeModel;
 		filterKeywords.actionType = 675;
 		filterKeywords.duxIconName = @"ic_funnel_outlined_20";
-		filterKeywords.describeString = @"过滤关键词调整";
+		filterKeywords.describeString = @"过滤文案";
 
 		filterKeywords.action = ^{
 		  NSString *descText = [self.awemeModel valueForKey:@"descriptionString"];
@@ -429,140 +433,65 @@
 		[viewModels addObject:filterKeywords];
 	}
 
-    NSMutableArray<AWELongPressPanelViewGroupModel *> *customGroups = [NSMutableArray array];
-    NSInteger maxPerGroup = 5;
-    for (NSInteger i = 0; i < viewModels.count; i += maxPerGroup) {
-        NSRange range = NSMakeRange(i, MIN(maxPerGroup, viewModels.count - i));
-        NSArray<AWELongPressPanelBaseViewModel *> *subArr = [viewModels subarrayWithRange:range];
-        AWELongPressPanelViewGroupModel *groupModel = [[%c(AWELongPressPanelViewGroupModel) alloc] init];
-        [groupModel setIsDYYYCustomGroup:YES];
-        groupModel.groupType = 12;
-        groupModel.isModern = YES;
-        groupModel.groupArr = subArr;
-        [customGroups addObject:groupModel];
-    }
+	NSMutableArray<AWELongPressPanelViewGroupModel *> *customGroups = [NSMutableArray array];
+	NSInteger maxPerGroup = 4;
+	int groupIndex = 0;
+	for (NSInteger i = 0; i < viewModels.count; i += maxPerGroup) {
+		NSRange range = NSMakeRange(i, MIN(maxPerGroup, viewModels.count - i));
+		NSArray<AWELongPressPanelBaseViewModel *> *subArr = [viewModels subarrayWithRange:range];
+		AWELongPressPanelViewGroupModel *groupModel = [[%c(AWELongPressPanelViewGroupModel) alloc] init];
+		groupModel.isDYYYCustomGroup = YES;
 
-    // 返回自定义分组拼接原始分组
-    return [customGroups arrayByAddingObjectsFromArray:originalArray];
-}
+		// 如果是第二列（索引为1）且元素数量小于4个，则设置groupType为11
+		if (groupIndex == 1 && subArr.count < 4) {
+			groupModel.groupType = 11;
+		} else {
+			groupModel.groupType = 12;
+		}
 
-%end
-
-%hook AWELongPressPanelViewGroupModel
-
-%new
-- (void)setIsDYYYCustomGroup:(BOOL)isCustom {
-    objc_setAssociatedObject(self, @selector(isDYYYCustomGroup), @(isCustom), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}
-
-%new
-- (BOOL)isDYYYCustomGroup {
-    NSNumber *value = objc_getAssociatedObject(self, @selector(isDYYYCustomGroup));
-    return [value boolValue];
+		groupModel.isModern = YES;
+		groupModel.groupArr = subArr;
+		[customGroups addObject:groupModel];
+		groupIndex++;
+	}
+	return [customGroups arrayByAddingObjectsFromArray:originalArray];
 }
 
 %end
 
 %hook AWEModernLongPressHorizontalSettingCell
 
-- (void)setLongPressViewGroupModel:(AWELongPressPanelViewGroupModel *)groupModel {
-    %orig;
-	
-    if (groupModel && [groupModel isDYYYCustomGroup]) {
-        [self setupCustomLayout];
-    }
-}
-
-%new
-- (void)setupCustomLayout {
-    if (self.collectionView) {
-        NSInteger itemCount = self.dataArray.count;
-        
-        UICollectionViewFlowLayout *layout = (UICollectionViewFlowLayout *)self.collectionView.collectionViewLayout;
-        if (layout) {
-            layout.scrollDirection = UICollectionViewScrollDirectionHorizontal;
-            
-            CGFloat spacing = 0;
-            
-            layout.minimumInteritemSpacing = spacing;
-            layout.minimumLineSpacing = spacing;
-
-            [self.collectionView setCollectionViewLayout:layout animated:NO];
-        }
-    }
-}
-
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)layout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
+	if (self.longPressViewGroupModel && [self.longPressViewGroupModel isDYYYCustomGroup]) {
+		if (self.dataArray && indexPath.item < self.dataArray.count) {
+			CGFloat totalWidth = collectionView.bounds.size.width;
+			NSInteger itemCount = self.dataArray.count;
+			CGFloat itemWidth = totalWidth / itemCount;
+			return CGSizeMake(itemWidth, 73);
+		}
+		return CGSizeMake(73, 73);
+	}
 
-    if (self.longPressViewGroupModel && [self.longPressViewGroupModel isDYYYCustomGroup]) {
-        if (self.dataArray && indexPath.item < self.dataArray.count) {
-            AWELongPressPanelBaseViewModel *model = self.dataArray[indexPath.item];
-            NSString *text = model.describeString;
-            
-            CGFloat textWidth = [self widthForText:text];
-            CGFloat cellWidth = MAX(70, textWidth + 20); 
-            
-            return CGSizeMake(cellWidth, 75);
-        }
-        return CGSizeMake(75, 75);
-    }
-    
-    return %orig;
-}
-
-
-%new
-- (CGFloat)widthForText:(NSString *)text {
-    if (!text || text.length == 0) {
-        return 0;
-    }
-    
-    UIFont *font = [UIFont systemFontOfSize:12];
-    NSDictionary *attributes = @{NSFontAttributeName: font};
-    CGSize textSize = [text boundingRectWithSize:CGSizeMake(MAXFLOAT, 20)
-                                        options:NSStringDrawingUsesLineFragmentOrigin
-                                     attributes:attributes
-                                        context:nil].size;
-    return textSize.width;
+	return %orig;
 }
 
 %end
 
-%hook AWEModernLongPressHorizontalSettingItemCell
+%hook AWEModernLongPressInteractiveCell
 
-- (void)updateUI:(AWELongPressPanelBaseViewModel *)viewModel {
-    %orig;
-    
-    if (viewModel && viewModel.actionType >= 666 && viewModel.actionType <= 680) {
-        CGFloat padding = 0;
+- (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)layout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
+	if (self.longPressViewGroupModel && [self.longPressViewGroupModel isDYYYCustomGroup]) {
+		if (self.dataArray && indexPath.item < self.dataArray.count) {
 
-        CGFloat contentWidth = self.contentView.bounds.size.width;
-        
-        CGRect iconFrame = self.buttonIcon.frame;
-        iconFrame.origin.x = (contentWidth - iconFrame.size.width) / 2;
-        iconFrame.origin.y = padding;
-        self.buttonIcon.frame = iconFrame;
+			NSInteger itemCount = self.dataArray.count;
+			CGFloat totalWidth = collectionView.bounds.size.width - 12 * (itemCount - 1);
+			CGFloat itemWidth = totalWidth / itemCount;
+			return CGSizeMake(itemWidth, 73);
+		}
+		return CGSizeMake(73, 73);
+	}
 
-        CGFloat labelY = CGRectGetMaxY(iconFrame) + 4;
-        CGFloat labelWidth = contentWidth;
-        CGFloat labelHeight = self.contentView.bounds.size.height - labelY - padding;
-        
-        self.buttonLabel.frame = CGRectMake(padding, labelY, labelWidth, labelHeight);
-        self.buttonLabel.textAlignment = NSTextAlignmentCenter;
-        self.buttonLabel.numberOfLines = 2;
-        self.buttonLabel.font = [UIFont systemFontOfSize:12];
-        
-        if (self.separator) {
-            self.separator.hidden = YES;
-        }
-    }
-}
-
-- (void)layoutSubviews {
-    %orig;
-    if (self.longPressPanelVM && self.longPressPanelVM.actionType >= 666 && self.longPressPanelVM.actionType <= 680) {
-        [self updateUI:self.longPressPanelVM];
-    }
+	return %orig;
 }
 
 %end
@@ -822,7 +751,7 @@
 		copyShareLink.awemeModel = self.awemeModel;
 		copyShareLink.actionType = 672;
 		copyShareLink.duxIconName = @"ic_share_outlined";
-		copyShareLink.describeString = @"复制分享链接";
+		copyShareLink.describeString = @"复制链接";
 
 		copyShareLink.action = ^{
 		  NSString *shareLink = [self.awemeModel valueForKey:@"shareURL"];
