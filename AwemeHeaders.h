@@ -127,6 +127,7 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @end
 
 @interface AWENormalModeTabBarGeneralButton : UIButton
+@property (nonatomic) NSInteger status;
 @end
 
 @interface AWEHPTopTabItemBadgeContentView : UIView
@@ -221,6 +222,9 @@ typedef NS_ENUM(NSInteger, MediaType) {
 
 @interface AWENormalModeTabBarTextView : UIView
 
+@end
+
+@interface AWEFamiliarNavView : UIView
 @end
 
 @interface AWEPlayInteractionNewBaseController : UIView
@@ -405,6 +409,7 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @interface AWEHPTopTabItemModel : NSObject
 @property (nonatomic, copy) NSString *channelID;
 @property (nonatomic, copy) NSString *channelTitle;
+@property (nonatomic, copy) NSString *title;
 @end
 
 @interface AWEPlayInteractionStrongifyShareContentView : UIView
@@ -893,4 +898,28 @@ typedef NS_ENUM(NSInteger, MediaType) {
 // 隐藏状态栏
 @interface AWEFeedRootViewController : UIViewController
 - (BOOL)prefersStatusBarHidden;
+@end
+
+@interface AWEFeedUnfollowFamiliarFollowAndDislikeView : UIView
+@end
+
+@interface AWEDPlayerFeedPlayerViewController : UIViewController
+@property (nonatomic) UIView *contentView;
+- (void)setVideoControllerPlaybackRate:(double)arg0;
+@end
+
+//底部热点提示框
+@interface AWENewHotSpotBottomBarView : UIView
+@property (nonatomic, strong, readonly) UIView *superview;
+@property (nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+//评论区免费去看短剧
+@interface AWEShowPlayletCommentHeaderView : UIView
+- (void)setHidden:(BOOL)hidden;
+- (BOOL)isHidden;
+- (void)layoutSubviews;
+@end
+
+@interface AWEDemaciaChapterProgressSlider : UIView
 @end
