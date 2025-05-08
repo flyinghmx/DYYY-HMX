@@ -720,20 +720,6 @@ static void DYYYAddCustomViewToParent(UIView *parentView, float transparency) {
 
 %hook AWEAwemeModel
 
-- (BOOL)awe_enableHDR {
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDisableHDR"]) {
-        return NO;
-    }
-    return %orig;
-}
-
-- (id)awe_HDRValueFor:(NSInteger)arg1 {
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDisableHDR"]) {
-        return nil;
-    }
-    return %orig;
-}
-
 - (id)initWithDictionary:(id)arg1 error:(id *)arg2 {
 	id orig = %orig;
 
@@ -1460,45 +1446,59 @@ static void DYYYAddCustomViewToParent(UIView *parentView, float transparency) {
 
 %hook AWEPlayInteractionTimestampElement
 - (id)timestampLabel {
-	UILabel *label = %orig;
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"]) {
-		NSString *text = label.text;
-		NSString *cityCode = self.model.cityCode;
+    UILabel *label = %orig;
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"]) {
+        NSString *text = label.text;
+        NSString *cityCode = self.model.cityCode;
 
-		if (cityCode.length > 0) {
-			NSString *cityName = [CityManager.sharedInstance getCityNameWithCode:cityCode] ?: @"";
-			NSString *provinceName = [CityManager.sharedInstance getProvinceNameWithCode:cityCode] ?: @"";
+        if (cityCode.length > 0) {
+            NSString *cityName = [CityManager.sharedInstance getCityNameWithCode:cityCode];
+            NSString *provinceName = [CityManager.sharedInstance getProvinceNameWithCode:cityCode];
+            
+            // 如果常规匹配没有找到城市名，检查是否是国外地址代码
+            if (!cityName || cityName.length == 0) {
+                // 尝试国外匹配：检查前缀是否与国外代码匹配
+                for (int i = 1; i <= cityCode.length && i <= 3; i++) {
+                    NSString *prefixCode = [cityCode substringToIndex:i];
+                    NSString *foreignCountryName = [CityManager.sharedInstance getCityNameWithCode:prefixCode];
+                    if (foreignCountryName && foreignCountryName.length > 0) {
+                        label.text = [NSString stringWithFormat:@"%@  IP属地：%@", text, foreignCountryName];
+                        break;
+                    }
+                }
+            } else if (![text containsString:cityName]) {
+                // 国内地址常规处理
+                if (!self.model.ipAttribution) {
+                    BOOL isDirectCity = [provinceName isEqualToString:cityName] ||
+                            ([cityCode hasPrefix:@"11"] || [cityCode hasPrefix:@"12"] || 
+                             [cityCode hasPrefix:@"31"] || [cityCode hasPrefix:@"50"]);
 
-			if (cityName.length > 0 && ![text containsString:cityName]) {
-				if (!self.model.ipAttribution) {
-					BOOL isDirectCity = [provinceName isEqualToString:cityName] ||
-							    ([cityCode hasPrefix:@"11"] || [cityCode hasPrefix:@"12"] || [cityCode hasPrefix:@"31"] || [cityCode hasPrefix:@"50"]);
+                    if (isDirectCity) {
+                        label.text = [NSString stringWithFormat:@"%@  IP属地：%@", text, cityName];
+                    } else {
+                        label.text = [NSString stringWithFormat:@"%@  IP属地：%@ %@", text, provinceName, cityName];
+                    }
+                } else {
+                    BOOL isDirectCity = [provinceName isEqualToString:cityName] ||
+                            ([cityCode hasPrefix:@"11"] || [cityCode hasPrefix:@"12"] || 
+                             [cityCode hasPrefix:@"31"] || [cityCode hasPrefix:@"50"]);
 
-					if (isDirectCity) {
-						label.text = [NSString stringWithFormat:@"%@  IP属地：%@", text, cityName];
-					} else {
-						label.text = [NSString stringWithFormat:@"%@  IP属地：%@ %@", text, provinceName, cityName];
-					}
-				} else {
-					BOOL isDirectCity = [provinceName isEqualToString:cityName] ||
-							    ([cityCode hasPrefix:@"11"] || [cityCode hasPrefix:@"12"] || [cityCode hasPrefix:@"31"] || [cityCode hasPrefix:@"50"]);
-
-					BOOL containsProvince = [text containsString:provinceName];
-					if (containsProvince && !isDirectCity) {
-						label.text = [NSString stringWithFormat:@"%@ %@", text, cityName];
-					} else if (containsProvince && isDirectCity) {
-						label.text = [NSString stringWithFormat:@"%@  IP属地：%@", text, cityName];
-					} else if (isDirectCity && containsProvince) {
-						label.text = text;
-					} else if (containsProvince) {
-						label.text = [NSString stringWithFormat:@"%@ %@", text, cityName];
-					} else {
-						label.text = text;
-					}
-				}
-			}
-		}
-	}
+                    BOOL containsProvince = [text containsString:provinceName];
+                    if (containsProvince && !isDirectCity) {
+                        label.text = [NSString stringWithFormat:@"%@ %@", text, cityName];
+                    } else if (containsProvince && isDirectCity) {
+                        label.text = [NSString stringWithFormat:@"%@  IP属地：%@", text, cityName];
+                    } else if (isDirectCity && containsProvince) {
+                        label.text = text;
+                    } else if (containsProvince) {
+                        label.text = [NSString stringWithFormat:@"%@ %@", text, cityName];
+                    } else {
+                        label.text = text;
+                    }
+                }
+            }
+        }
+    }
 	// 应用IP属地标签上移
 	NSString *ipScaleValue = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYNicknameScale"];
 	if (ipScaleValue.length > 0) {
@@ -1516,7 +1516,6 @@ static void DYYYAddCustomViewToParent(UIView *parentView, float transparency) {
 		label.font = originalFont;
 	}
 	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnabsuijiyanse"]) {
-		// 随机生成3个颜色，suiji
 		UIColor *color1 = [UIColor colorWithRed:(CGFloat)arc4random_uniform(256) / 255.0
 						  green:(CGFloat)arc4random_uniform(256) / 255.0
 						   blue:(CGFloat)arc4random_uniform(256) / 255.0
@@ -1905,15 +1904,6 @@ static CGFloat currentScale = 1.0;
 // 获取资源的地址
 %hook AWEURLModel
 %new - (NSURL *)getDYYYSrcURLDownload {
-	;
-	;
-	;
-	;
-	;
-	;
-	;
-	;
-	;
 	NSURL *bestURL;
 	for (NSString *url in self.originURLList) {
 		if ([url containsString:@"video_mp4"] || [url containsString:@".jpeg"] || [url containsString:@".mp3"]) {
@@ -2179,6 +2169,37 @@ static CGFloat currentScale = 1.0;
 		[[UIPasteboard generalPasteboard] setString:descText];
 		[DYYYManager showToast:@"文案已复制到剪贴板"];
 	}
+}
+%end
+
+// 禁用AWEPlayVideoViewController中的HDR
+%hook AWEPlayVideoViewController
+- (void)setHDRVideoMode:(NSInteger)mode {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDisableHDR"]) {
+        %orig(0); 
+    } else {
+        %orig; 
+    }
+}
+%end
+// 禁用BDSimMediaPlayer中的HDR
+%hook BDSimMediaPlayer
+- (void)setHDRVideoMode:(NSInteger)mode {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDisableHDR"]) {
+        %orig(0);
+    } else {
+        %orig;
+    }
+}
+%end
+// 禁用BDSimPlayerMediaViewController中的HDR
+%hook BDSimPlayerMediaViewController
+- (void)setHDRVideoMode:(NSInteger)mode {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDisableHDR"]) {
+        %orig(0);
+    } else {
+        %orig;
+    }
 }
 %end
 

@@ -1053,6 +1053,11 @@ static void showUserAgreementAlert() {
 			      @"detail" : @"",
 			      @"cellType" : @6,
 			      @"imageName" : @"ic_eyeslash_outlined_16"},
+				@{@"identifier" : @"DYYYHideFollowPromptView",
+			      @"title" : @"移除头像加号",
+			      @"detail" : @"",
+			      @"cellType" : @6,
+			      @"imageName" : @"ic_eyeslash_outlined_16"},
 			    @{@"identifier" : @"DYYYHideLikeLabel",
 			      @"title" : @"隐藏点赞数值",
 			      @"detail" : @"",
@@ -1386,7 +1391,13 @@ static void showUserAgreementAlert() {
 			      @"title" : @"隐藏键盘AI",
 			      @"detail" : @"",
 			      @"cellType" : @6,
-			      @"imageName" : @"ic_eyeslash_outlined_16"}
+			      @"imageName" : @"ic_eyeslash_outlined_16"},
+				@{@"identifier" : @"DYYYHideScancode",
+				  @"title" : @"隐藏输入扫码",
+				  @"detail" : @"",
+			      @"cellType" : @6,
+			      @"imageName" : @"ic_eyeslash_outlined_16"
+				}
 		    ];
 
 		    for (NSDictionary *dict in infoSettings) {
@@ -1404,6 +1415,16 @@ static void showUserAgreementAlert() {
 			      @"imageName" : @"ic_eyeslash_outlined_16"},
 			    @{@"identifier" : @"DYYYHideEnterLive",
 			      @"title" : @"隐藏进入直播",
+			      @"detail" : @"",
+			      @"cellType" : @6,
+			      @"imageName" : @"ic_eyeslash_outlined_16"},
+				@{@"identifier" : @"DYYYHideLiveRoomClose",
+			      @"title" : @"隐藏关闭按钮",
+			      @"detail" : @"",
+			      @"cellType" : @6,
+			      @"imageName" : @"ic_eyeslash_outlined_16"},
+				@{@"identifier" : @"DYYYHideLiveRoomFullscreen",
+			      @"title" : @"隐藏横屏按钮",
 			      @"detail" : @"",
 			      @"cellType" : @6,
 			      @"imageName" : @"ic_eyeslash_outlined_16"},
@@ -1783,7 +1804,7 @@ static void showUserAgreementAlert() {
 			      @"cellType" : @6,
 			      @"imageName" : @"ic_userban_outlined_20"},
 			    @{@"identifier" : @"DYYYLongPressFilterTitle",
-			      @"title" : @"长按面板过滤标题",
+			      @"title" : @"长按面板过滤文案",
 			      @"detail" : @"",
 			      @"cellType" : @6,
 			      @"imageName" : @"ic_funnel_outlined_20"},
