@@ -78,8 +78,7 @@ static BOOL isDownloadFlied = NO;
 				NSURL *heifURL = [NSURL URLWithString:urlString];
 				[DYYYManager downloadMedia:heifURL
 						 mediaType:MediaTypeHeic
-						completion:^{
-						  [DYYYManager showToast:@"表情包已保存到相册"];
+						completion:^(BOOL success){
 						}];
 				return;
 			}
@@ -173,8 +172,11 @@ static BOOL isDownloadFlied = NO;
 	NSURL *url = [NSURL URLWithString:urlString];
 	[DYYYManager downloadMedia:url
 			 mediaType:MediaTypeHeic
-			completion:^{
-			  [DYYYManager showToast:@"表情包已保存到相册"];
+			completion:^(BOOL success){
+			  if (success) {
+			  } else {
+				  [DYYYManager showToast:@"表情包保存失败"];
+			  }
 			}];
 }
 
