@@ -173,13 +173,21 @@ static BOOL isDownloadFlied = NO;
 	[DYYYManager downloadMedia:url
 			 mediaType:MediaTypeHeic
 			completion:^(BOOL success){
-			  if (success) {
-			  } else {
-				  [DYYYManager showToast:@"表情包保存失败"];
-			  }
 			}];
 }
 
+%end
+
+%hook AWELongVideoControlModel
+- (bool)allowDownload {
+	return YES;
+}
+%end
+
+%hook AWELongVideoControlModel
+- (long long)preventDownloadType {
+	return 0;
+}
 %end
 
 %ctor {
