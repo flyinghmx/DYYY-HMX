@@ -215,8 +215,6 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @end
 
 @interface AWEPlayInteractionFollowPromptView : UIView
- - (void)handleTapWithConfirmation:(UITapGestureRecognizer *)gesture;
- - (void)performOriginalTapAction;
 @end
 
 @interface AWENormalModeTabBarTextView : UIView
@@ -263,6 +261,12 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @interface AWEFeedTableView : UIView
 @end
 
+@interface AWEAwemeDetailTableView : UIView
+@end
+
+@interface AWEAwemeDetailTableViewCell : UIView
+@end
+
 @interface IESLiveFeedDrawerEntranceView : UIView
 @end
 
@@ -292,6 +296,7 @@ typedef NS_ENUM(NSInteger, MediaType) {
 
 // 隐藏同城定位
 @interface AWEMarkView : UIView
+@property(nonatomic, readonly) UILabel *markLabel;
 @end
 
 @interface AWEPlayInteractionSearchAnchorView : UIView
@@ -399,6 +404,9 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @property(nonatomic, strong) UIView *leftLabelUI;
 @property(nonatomic, strong) UIView *rightLabelUI;
 @property(nonatomic) AWEPlayInteractionProgressController *progressSliderDelegate;
+
+- (void)applyCustomProgressStyle;
+- (void)applyWidthPercentToSubviews:(CGFloat)widthPercent;
 @end
 
 @interface AWEFeedChannelObject : NSObject
@@ -640,10 +648,6 @@ typedef NS_ENUM(NSInteger, MediaType) {
 + (instancetype)actionWithTitle:(NSString *)title style:(NSUInteger)style imgName:(NSString *)imgName handler:(id)handler;
 @end
 
-@interface AWEFeedProgressSlider (CustomAdditions)
-- (void)applyCustomProgressStyle;
-@end
-
 @interface AWEPlayInteractionDescriptionScrollView : UIScrollView
 @end
 
@@ -714,6 +718,9 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @interface AWEHPTopBarCTAItemView : UIView
 @end
 
+@interface AWEVideoPlayDanmakuContainerView : UIView
+@end
+
 // 应用内推送容器
 @interface AWEInnerNotificationWindow : UIWindow
 - (void)setupBlurEffectForNotificationView;
@@ -768,11 +775,14 @@ typedef NS_ENUM(NSInteger, MediaType) {
 - (AWESettingItemModel *)createSettingItem:(NSDictionary *)dict;
 - (AWESettingItemModel *)createSettingItem:(NSDictionary *)dict cellTapHandlers:(NSMutableDictionary *)cellTapHandlers;
 
-- (void)applyDependencyRulesForItem:(AWESettingItemModel *)item;
 - (void)refreshTableView;
 - (void)updateSectionDataArray;
 - (void)handleConflictsAndDependenciesForSetting:(NSString *)identifier isEnabled:(BOOL)isEnabled;
 - (void)updateDependentItemsForSetting:(NSString *)identifier value:(id)value;
+- (void)handleConflictsAndDependenciesForSetting:(NSString *)identifier isEnabled:(BOOL)isEnabled;
+- (void)applyDependencyRulesForItem:(AWESettingItemModel *)item;
+- (void)updateConflictingItemUIState:(NSString *)identifier withValue:(BOOL)value;
+- (NSDictionary *)settingsDependencyConfig;
 @end
 
 @interface AWENavigationBar : UIView
@@ -908,6 +918,10 @@ typedef NS_ENUM(NSInteger, MediaType) {
 - (BOOL)prefersStatusBarHidden;
 @end
 
+@interface IESLiveAudienceViewController : UIView
+- (BOOL)prefersStatusBarHidden;
+@end
+
 @interface AWEFeedUnfollowFamiliarFollowAndDislikeView : UIView
 @end
 
@@ -935,7 +949,7 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @interface AWEDemaciaChapterProgressSlider : UIView
 @end
 
-//HDR
+// HDR
 @interface AWEHDRModelManager : NSObject
 + (BOOL)enableVideoHDR;
 + (BOOL)useOneKeyHDR;

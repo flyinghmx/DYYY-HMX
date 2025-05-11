@@ -806,6 +806,21 @@
 }
 %end
 
+// 直播状态栏
+%hook IESLiveAudienceViewController
+- (BOOL)prefersStatusBarHidden {
+	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisHideStatusbar"]) {
+		return YES;
+	} else {
+		if (class_getInstanceMethod([self class], @selector(prefersStatusBarHidden)) !=
+		    class_getInstanceMethod([%c(IESLiveAudienceViewController) class], @selector(prefersStatusBarHidden))) {
+			return %orig;
+		}
+		return NO;
+	}
+}
+%end
+
 // 隐藏视频定位
 %hook AWEFeedTemplateAnchorView
 
@@ -1187,12 +1202,14 @@
 %hook AWEHPDiscoverFeedEntranceView
 
 - (void)layoutSubviews {
-	%orig;
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideDiscover"]) {
-		for (UIView *subview in self.subviews) {
-			subview.hidden = YES;
-		}
-	}
+    %orig;
+
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideDiscover"]) {
+        UIView *firstSubview = self.subviews.firstObject;
+        if ([firstSubview isKindOfClass:[UIImageView class]]) {
+            ((UIImageView *)firstSubview).image = nil;
+        }
+    }
 }
 
 %end
