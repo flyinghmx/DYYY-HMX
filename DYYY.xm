@@ -14,6 +14,7 @@
 #import "DYYYManager.h"
 
 #import "DYYYConstants.h"
+#import "DYYYToast.h"
 
 %hook AWEPlayInteractionUserAvatarElement
 - (void)onFollowViewClicked:(UITapGestureRecognizer *)gesture {
@@ -1580,7 +1581,7 @@ static CGFloat rightLabelRightMargin = -1;
 		}
 		NSString *descText = [selectdComment content];
 		[[UIPasteboard generalPasteboard] setString:descText];
-		[DYYYManager showToast:@"文案已复制到剪贴板"];
+		[DYYYToast showSuccessToastWithMessage:@"评论已复制"];
 	}
 }
 %end
@@ -1647,6 +1648,41 @@ static CGFloat rightLabelRightMargin = -1;
 	}
 }
 
+%end
+
+// 强制启用新版抖音长按 UI（现代风）
+%hook AWELongPressPanelDataManager
++ (BOOL)enableModernLongPressPanelConfigWithSceneIdentifier:(id)arg1 {
+    return DYYYGetBool(@"DYYYisEnableModern") || DYYYGetBool(@"DYYYisEnableModernLight") || DYYYGetBool(@"DYYYModernPanelFollowSystem");
+}
+%end
+
+%hook AWELongPressPanelABSettings
++ (NSUInteger)modernLongPressPanelStyleMode {
+    if (DYYYGetBool(@"DYYYModernPanelFollowSystem")) {
+        BOOL isDarkMode = [DYYYManager isDarkMode];
+        return isDarkMode ? 1 : 2;
+    } else if (DYYYGetBool(@"DYYYisEnableModernLight")) {
+        return 2;
+    } else if (DYYYGetBool(@"DYYYisEnableModern")) {
+        return 1;
+    }
+    return 0;
+}
+%end
+
+%hook AWEModernLongPressPanelUIConfig
++ (NSUInteger)modernLongPressPanelStyleMode {
+    if (DYYYGetBool(@"DYYYModernPanelFollowSystem")) {
+        BOOL isDarkMode = [DYYYManager isDarkMode];
+        return isDarkMode ? 1 : 2;
+    } else if (DYYYGetBool(@"DYYYisEnableModernLight")) {
+        return 2;
+    } else if (DYYYGetBool(@"DYYYisEnableModern")) {
+        return 1;
+    }
+    return 0;
+}
 %end
 
 %ctor {
