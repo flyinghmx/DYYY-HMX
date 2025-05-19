@@ -161,6 +161,17 @@ static void DYYYAddCustomViewToParent(UIView *parentView, float transparency) {
 		return;
 	}
 
+	UIViewController *viewController = [self firstAvailableUIViewController];
+	if ([viewController isKindOfClass:%c(AWEMixVideoPanelDetailTableViewController)] && [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
+		self.backgroundColor = [UIColor clearColor];
+
+		for (UIView *subview in self.subviews) {
+			if ([subview isKindOfClass:[UIView class]]) {
+				subview.backgroundColor = [UIColor clearColor];
+			}
+		}
+	}
+
 	UIViewController *vc = [self firstAvailableUIViewController];
 	if ([vc isKindOfClass:%c(AWEAwemePlayVideoViewController)] || [vc isKindOfClass:%c(AWEDPlayerFeedPlayerViewController)]) {
 
@@ -191,12 +202,22 @@ static void DYYYAddCustomViewToParent(UIView *parentView, float transparency) {
 %hook AWEPlayInteractionViewController
 - (void)viewDidLayoutSubviews {
 	%orig;
-	if (![self.parentViewController isKindOfClass:%c(AWEFeedCellViewController)]) {
-		return;
-	}
+
 	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
+		NSString *currentReferString = self.referString;
 		CGRect frame = self.view.frame;
-		frame.size.height = self.view.superview.frame.size.height - 83;
+
+		// 根据referString来决定是否减去83点
+		if ([currentReferString isEqualToString:@"general_search"]) {
+			frame.size.height = self.view.superview.frame.size.height;
+		} else if ([currentReferString isEqualToString:@"chat"] || currentReferString == nil) {
+			frame.size.height = self.view.superview.frame.size.height;
+		} else if ([currentReferString isEqualToString:@"others_homepage"] || currentReferString == nil) {
+			frame.size.height = self.view.superview.frame.size.height - 83;
+		} else {
+			frame.size.height = self.view.superview.frame.size.height - 83;
+		}
+
 		self.view.frame = frame;
 	}
 }
@@ -215,6 +236,9 @@ static void DYYYAddCustomViewToParent(UIView *parentView, float transparency) {
 
 			if (frame.size.height == parentHeight - 83) {
 				frame.size.height = parentHeight;
+				contentView.frame = frame;
+			} else if (frame.size.height == parentHeight - 166) {
+				frame.size.height = parentHeight - 83;
 				contentView.frame = frame;
 			}
 		}
@@ -335,7 +359,7 @@ static CGFloat currentScale = 1.0;
 			}
 		}
 	}
-	// 左侧元素的处理逻辑（仅当未锁定时执行）
+	// 左侧元素的处理逻辑
 	else if ([self.accessibilityLabel isEqualToString:@"left"]) {
 		NSString *scaleValue = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYNicknameScale"];
 
@@ -395,8 +419,8 @@ static CGFloat currentScale = 1.0;
 			}
 		}
 	}
-    NSArray *originalSubviews = %orig;
-    return originalSubviews;
+	NSArray *originalSubviews = %orig;
+	return originalSubviews;
 }
 
 %end
@@ -490,9 +514,21 @@ static CGFloat currentScale = 1.0;
 - (void)setHidden:(BOOL)hidden {
 	%orig(hidden);
 
+	Class generalButtonClass = %c(AWENormalModeTabBarGeneralButton);
+	for (UIView *subview in self.subviews) {
+		if ([subview isKindOfClass:generalButtonClass]) {
+			AWENormalModeTabBarGeneralButton *button = (AWENormalModeTabBarGeneralButton *)subview;
+			if ([button.accessibilityLabel isEqualToString:@"首页"] && [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDisableHomeRefresh"] && button.status == 2) {
+				button.userInteractionEnabled = NO;
+			} else if ([button.accessibilityLabel isEqualToString:@"首页"] && [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDisableHomeRefresh"] && button.status == 1) {
+				button.userInteractionEnabled = YES;
+			}
+		}
+	}
+
 	BOOL hideBottomBg = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisHiddenBottomBg"];
 
-	// 如果开启了隐藏底部背景，则直接隐藏背景视图，不进行其他判断
+	// 如果开启了隐藏底部背景，则直接隐藏背景视图
 	if (hideBottomBg) {
 		UIView *backgroundView = nil;
 		for (UIView *subview in self.subviews) {
@@ -512,23 +548,6 @@ static CGFloat currentScale = 1.0;
 			}
 		}
 	} else {
-		Class generalButtonClass = %c(AWENormalModeTabBarGeneralButton);
-
-		for (UIView *subview in self.subviews) {
-			if ([subview isKindOfClass:generalButtonClass]) {
-				AWENormalModeTabBarGeneralButton *button = (AWENormalModeTabBarGeneralButton *)subview;
-				if ([button.accessibilityLabel isEqualToString:@"首页"] && [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDisableHomeRefresh"] && button.status == 2) {
-					if (button.gestureRecognizers && button.gestureRecognizers.count > 0) {
-						button.userInteractionEnabled = NO;
-					}
-				} else if ([button.accessibilityLabel isEqualToString:@"首页"] && [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDisableHomeRefresh"] && button.status == 1) {
-					if (button.gestureRecognizers && button.gestureRecognizers.count > 0) {
-						button.userInteractionEnabled = YES;
-					}
-				}
-			}
-		}
-
 		// 仅对全屏模式处理背景显示逻辑
 		if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
 			UIView *backgroundView = nil;
@@ -593,8 +612,67 @@ static CGFloat currentScale = 1.0;
 
 %end
 
+%hook AWEAwemeDetailTableView
+
+- (void)setFrame:(CGRect)frame {
+	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
+		CGFloat screenHeight = [UIScreen mainScreen].bounds.size.height;
+
+		CGFloat remainder = fmod(frame.size.height, screenHeight);
+		if (remainder != 0) {
+			frame.size.height += (screenHeight - remainder);
+		}
+	}
+	%orig(frame);
+}
+
+%end
+
+%hook AWEMixVideoPanelMoreView
+
+- (void)setFrame:(CGRect)frame {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
+        frame.origin.y -= 83;
+    }
+    %orig(frame);
+}
+
+%end
+
+%hook CommentInputContainerView
+
+- (void)layoutSubviews {
+    %orig;
+    UIViewController *parentVC = nil;
+    if ([self respondsToSelector:@selector(viewController)]) {
+        id viewController = [self performSelector:@selector(viewController)];
+        if ([viewController respondsToSelector:@selector(parentViewController)]) {
+            parentVC = [viewController parentViewController];
+        }
+    }
+
+    if (parentVC && ([parentVC isKindOfClass:%c(AWEAwemeDetailTableViewController)] || [parentVC isKindOfClass:%c(AWEAwemeDetailCellViewController)])) {
+        for (UIView *subview in [self subviews]) {
+            if ([subview class] == [UIView class]) {
+                if ([(UIView *)self frame].size.height == 83) {
+                    subview.hidden = YES;
+                } else {
+                    subview.hidden = NO;
+                }
+                break;
+            }
+        }
+    }
+}
+
+%end
+
 %ctor {
 	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYUserAgreementAccepted"]) {
-		%init;
+		static dispatch_once_t onceToken;
+		dispatch_once(&onceToken, ^{
+		  Class wSwiftImpl = objc_getClass("AWECommentInputViewSwiftImpl.CommentInputContainerView");
+		  %init(CommentInputContainerView = wSwiftImpl);
+		});
 	}
 }
