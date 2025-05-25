@@ -136,6 +136,8 @@ typedef NS_ENUM(NSInteger, DYYYSettingItemType) {
         @[
             [DYYYSettingItem itemWithTitle:@"启用弹幕改色" key:@"DYYYEnableDanmuColor" type:DYYYSettingItemTypeSwitch],
             [DYYYSettingItem itemWithTitle:@"自定弹幕颜色" key:@"DYYYdanmuColor" type:DYYYSettingItemTypeTextField placeholder:@"十六进制"],
+            [DYYYSettingItem itemWithTitle:@"设置默认倍速" key:@"DYYYDefaultSpeed" type:DYYYSettingItemTypeSpeedPicker],
+            [DYYYSettingItem itemWithTitle:@"设置长按倍速" key:@"DYYYLongPressSpeed" type:DYYYSettingItemTypeSpeedPicker],
             [DYYYSettingItem itemWithTitle:@"显示进度时长" key:@"DYYYisShowScheduleDisplay" type:DYYYSettingItemTypeSwitch],
             [DYYYSettingItem itemWithTitle:@"进度纵轴位置" key:@"DYYYTimelineVerticalPosition" type:DYYYSettingItemTypeTextField placeholder:@"-12.5"],
             [DYYYSettingItem itemWithTitle:@"进度标签颜色" key:@"DYYYProgressLabelColor" type:DYYYSettingItemTypeTextField placeholder:@"十六进制"],
@@ -170,7 +172,6 @@ typedef NS_ENUM(NSInteger, DYYYSettingItemType) {
             [DYYYSettingItem itemWithTitle:@"设置顶栏透明" key:@"DYYYtopbartransparent" type:DYYYSettingItemTypeTextField placeholder:@"0-1小数"],
             [DYYYSettingItem itemWithTitle:@"设置全局透明" key:@"DYYYGlobalTransparency" type:DYYYSettingItemTypeTextField placeholder:@"0-1小数"],
             [DYYYSettingItem itemWithTitle:@"首页头像透明" key:@"DYYYAvatarViewTransparency" type:DYYYSettingItemTypeTextField placeholder:@"0-1小数"],                              
-            [DYYYSettingItem itemWithTitle:@"设置默认倍速" key:@"DYYYDefaultSpeed" type:DYYYSettingItemTypeSpeedPicker],
             [DYYYSettingItem itemWithTitle:@"右侧栏缩放度" key:@"DYYYElementScale" type:DYYYSettingItemTypeTextField placeholder:@"不填默认"],
             [DYYYSettingItem itemWithTitle:@"昵称文案缩放" key:@"DYYYNicknameScale" type:DYYYSettingItemTypeTextField placeholder:@"不填默认"],
             [DYYYSettingItem itemWithTitle:@"昵称下移距离" key:@"DYYYNicknameVerticalOffset" type:DYYYSettingItemTypeTextField placeholder:@"不填默认"],
@@ -343,8 +344,8 @@ typedef NS_ENUM(NSInteger, DYYYSettingItemType) {
             [DYYYSettingItem itemWithTitle:@"禁用双击视频点赞" key:@"DYYYDouble" type:DYYYSettingItemTypeSwitch],
             [DYYYSettingItem itemWithTitle:@"保存评论区表情包" key:@"DYYYForceDownloadEmotion" type:DYYYSettingItemTypeSwitch],
             [DYYYSettingItem itemWithTitle:@"保存预览页表情包" key:@"DYYYForceDownloadPreviewEmotion" type:DYYYSettingItemTypeSwitch],
-            [DYYYSettingItem itemWithTitle:@"长按评论复制文案" key:@"DYYYCommentCopyText" type:DYYYSettingItemTypeSwitch],
-            [DYYYSettingItem itemWithTitle:@"视频降噪人声增强" key:@"DYYYEnableNoiseFilter" type:DYYYSettingItemTypeSwitch]
+            [DYYYSettingItem itemWithTitle:@"保存聊天页表情包" key:@"DYYYForceDownloadIMEmotion" type:DYYYSettingItemTypeSwitch],
+            [DYYYSettingItem itemWithTitle:@"长按评论复制文案" key:@"DYYYCommentCopyText" type:DYYYSettingItemTypeSwitch]
         ],
         @[
             [DYYYSettingItem itemWithTitle:@"启用快捷倍速按钮" key:@"DYYYEnableFloatSpeedButton" type:DYYYSettingItemTypeSwitch],
@@ -585,14 +586,19 @@ typedef NS_ENUM(NSInteger, DYYYSettingItemType) {
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
 
         UITextField *speedField = [[UITextField alloc] initWithFrame:CGRectMake(0, 0, 80, 30)];
-        speedField.text = [NSString stringWithFormat:@"%.2f", [[NSUserDefaults standardUserDefaults] floatForKey:@"DYYYDefaultSpeed"]];
+        // 根据对应的key获取倍速值，如果没有设置则使用默认值1.0
+        float currentSpeed = [[NSUserDefaults standardUserDefaults] floatForKey:item.key];
+        if (currentSpeed == 0) {
+            currentSpeed = 1.0;
+        }
+        speedField.text = [NSString stringWithFormat:@"%.2f", currentSpeed];
         speedField.textColor = [UIColor whiteColor];
         speedField.borderStyle = UITextBorderStyleNone;
         speedField.backgroundColor = [UIColor clearColor];
         speedField.textAlignment = NSTextAlignmentRight;
         speedField.enabled = NO;
         
-        speedField.tag = 999;
+        speedField.tag = indexPath.section * 1000 + indexPath.row;
         cell.accessoryView = speedField;
     }
     
@@ -609,13 +615,15 @@ typedef NS_ENUM(NSInteger, DYYYSettingItemType) {
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     DYYYSettingItem *item = self.settingSections[indexPath.section][indexPath.row];
     if (item.type == DYYYSettingItemTypeSpeedPicker) {
-        [self showSpeedPicker];
+        [self showSpeedPickerForIndexPath:indexPath];
     }
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 }
 
-- (void)showSpeedPicker {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"选择倍速"
+- (void)showSpeedPickerForIndexPath:(NSIndexPath *)indexPath {
+    DYYYSettingItem *item = self.settingSections[indexPath.section][indexPath.row];
+    
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:[NSString stringWithFormat:@"选择%@", item.title]
                                                                    message:nil
                                                             preferredStyle:UIAlertControllerStyleActionSheet];
     
@@ -624,23 +632,15 @@ typedef NS_ENUM(NSInteger, DYYYSettingItemType) {
         UIAlertAction *action = [UIAlertAction actionWithTitle:[NSString stringWithFormat:@"%.2f", speed.floatValue]
                                                         style:UIAlertActionStyleDefault
                                                       handler:^(UIAlertAction * _Nonnull action) {
-            [[NSUserDefaults standardUserDefaults] setFloat:speed.floatValue forKey:@"DYYYDefaultSpeed"];
+            // 保存到对应的key
+            [[NSUserDefaults standardUserDefaults] setFloat:speed.floatValue forKey:item.key];
             [[NSUserDefaults standardUserDefaults] synchronize];
             
-            for (NSInteger section = 0; section < self.settingSections.count; section++) {
-                NSArray *items = self.settingSections[section];
-                for (NSInteger row = 0; row < items.count; row++) {
-                    DYYYSettingItem *item = items[row];
-                    if (item.type == DYYYSettingItemTypeSpeedPicker) {
-                        NSIndexPath *indexPath = [NSIndexPath indexPathForRow:row inSection:section];
-                        UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:indexPath];
-                        UITextField *speedField = [cell.accessoryView viewWithTag:999];
-                        if (speedField) {
-                            speedField.text = [NSString stringWithFormat:@"%.2f", speed.floatValue];
-                        }
-                        break;
-                    }
-                }
+            // 更新对应的cell显示
+            UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:indexPath];
+            UITextField *speedField = (UITextField *)cell.accessoryView;
+            if (speedField) {
+                speedField.text = [NSString stringWithFormat:@"%.2f", speed.floatValue];
             }
         }];
         [alert addAction:action];
@@ -650,7 +650,7 @@ typedef NS_ENUM(NSInteger, DYYYSettingItemType) {
     [alert addAction:cancelAction];
     
     if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
-        UITableViewCell *selectedCell = [self.tableView cellForRowAtIndexPath:[self.tableView indexPathForSelectedRow]];
+        UITableViewCell *selectedCell = [self.tableView cellForRowAtIndexPath:indexPath];
         alert.popoverPresentationController.sourceView = selectedCell;
         alert.popoverPresentationController.sourceRect = selectedCell.bounds;
     }

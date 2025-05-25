@@ -295,6 +295,9 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @interface AFDFastSpeedView : UIView
 @end
 
+@interface AWEAwemeOfflineBottomView : UIView
+@end
+
 @interface AWEUserWorkCollectionViewComponentCell : UICollectionViewCell
 @end
 
@@ -1047,4 +1050,34 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @interface AWELeftSideBarViewController : UIViewController
 @end
 @interface AWEFeedContainerViewController : UIViewController
+@end
+
+@interface AWEIMGiphyMessage : NSObject
+@property (nonatomic, copy, readwrite) AWEURLModel *giphyURL;
+@end
+
+@interface AWEIMMessageComponentContext : NSObject
+@property (nonatomic, weak, readwrite) AWEIMGiphyMessage *message;
+@end
+
+@interface AWEIMReusableCommonCell : UITableViewCell
+@property (nonatomic, weak, readwrite) id currentContext;
+@end
+
+@interface AWEIMCustomMenuModel : NSObject
+@property (nonatomic, copy, readwrite) NSString *title;
+@property (nonatomic, copy, readwrite) NSString *imageName;
+@property (nonatomic, copy, readwrite) id willPerformMenuActionSelectorBlock;
+@property (nonatomic, copy, readwrite) NSString *trackerName;
+@property (nonatomic, assign, readwrite) NSUInteger type;
+@end
+
+@interface AWEPlayInteractionSpeedController : NSObject
+@property (nonatomic, strong) id progressSliderDelegate;
+- (CGFloat)longPressFastSpeedValue;
+- (void)changeSpeed:(double)speed;
+- (void)handleLongPressLockedDoubleSpeedChanged:(id)arg1 gesture:(UIGestureRecognizer *)gesture;
+- (void)handleLongPressLockedSpeedBegan;
+- (void)handleLongPressLockedDoubleSpeedEnded:(id)arg1 gesture:(UIGestureRecognizer *)gesture;
+- (void)longPressSpeedControlDidChangeSpeed:(double)speed;
 @end
