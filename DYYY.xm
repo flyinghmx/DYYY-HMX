@@ -1909,9 +1909,10 @@ static CGFloat rightLabelRightMargin = -1;
 %end
 
 %end
+
 %hook AWEPlayInteractionSpeedController
 
-static BOOL isCustomSpeedActive = NO;
+static BOOL hasChangedSpeed = NO;
 
 - (CGFloat)longPressFastSpeedValue {
 	float longPressSpeed = [[NSUserDefaults standardUserDefaults] floatForKey:@"DYYYLongPressSpeed"];
@@ -1922,44 +1923,29 @@ static BOOL isCustomSpeedActive = NO;
 }
 
 - (void)changeSpeed:(double)speed {
-	float longPressSpeed = [[NSUserDefaults standardUserDefaults] floatForKey:@"DYYYLongPressSpeed"];
-	static BOOL justDeactivatedCustomSpeed = NO;
-
-	if (longPressSpeed == 0 || longPressSpeed == 2) {
-		%orig(speed);
-		return;
-	}
-
-	if (speed == longPressSpeed) {
-		if (isCustomSpeedActive) {
-			isCustomSpeedActive = NO;
-			justDeactivatedCustomSpeed = YES;
-			%orig(1.0);
-		} else {
-			isCustomSpeedActive = YES;
-			justDeactivatedCustomSpeed = NO;
-			%orig(longPressSpeed);
-		}
-	} else if (speed == 2.0) {
-		if (justDeactivatedCustomSpeed) {
-			justDeactivatedCustomSpeed = NO;
-			%orig(1.0);
-		} else if (!isCustomSpeedActive) {
-			isCustomSpeedActive = YES;
-			%orig(longPressSpeed);
-		} else {
-			%orig(longPressSpeed);
-		}
-	} else if (speed == 1.0) {
-		isCustomSpeedActive = NO;
-		justDeactivatedCustomSpeed = NO;
-		%orig(1.0);
-	} else {
-		isCustomSpeedActive = (speed == longPressSpeed);
-		justDeactivatedCustomSpeed = NO;
-		%orig(speed);
-	}
+    float longPressSpeed = [[NSUserDefaults standardUserDefaults] floatForKey:@"DYYYLongPressSpeed"];
+    
+    if (speed == 2.0) {
+        if (!hasChangedSpeed) {
+            if (longPressSpeed != 0 && longPressSpeed != 2.0) {
+                hasChangedSpeed = YES;
+                %orig(longPressSpeed);
+                return;
+            }
+        } else {
+            hasChangedSpeed = NO;
+            %orig(1.0);
+            return;
+        }
+    }
+    
+    if (longPressSpeed == 0 || longPressSpeed == 2) {
+        %orig(speed);
+        return;
+    }
 }
+
+
 %end
 
 %hook UILabel
@@ -2181,7 +2167,7 @@ static AWEIMReusableCommonCell *currentCell;
 
 	AWEIMCustomMenuModel *newMenuItem1 = [%c(AWEIMCustomMenuModel) new];
 	newMenuItem1.title = @"保存表情";
-	newMenuItem1.imageName = @"im_image_ensure_download";
+	newMenuItem1.imageName = @"im_emoticon_interactive_tab_new";
 	newMenuItem1.willPerformMenuActionSelectorBlock = ^(id arg1) {
 	  AWEIMMessageComponentContext *context = (AWEIMMessageComponentContext *)currentCell.currentContext;
 	  if ([context.message isKindOfClass:%c(AWEIMGiphyMessage)]) {
@@ -2958,6 +2944,28 @@ static AWEIMReusableCommonCell *currentCell;
 	}
 }
 
+%end
+
+%hook AWEPlayInteractionElementMaskView
+- (void)layoutSubviews {
+	%orig;
+
+	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideGradient"]) {
+		[self removeFromSuperview];
+		return;
+	}
+}
+%end
+
+%hook AWEGradientView
+- (void)layoutSubviews {
+	%orig;
+
+	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideGradient"]) {
+		[self removeFromSuperview];
+		return;
+	}
+}
 %end
 
 %hook AWENormalModeTabBar
@@ -3892,24 +3900,6 @@ static AWEIMReusableCommonCell *currentCell;
 
 - (id)init {
 	return nil;
-}
-%end
-
-%hook UIImageView
-- (void)layoutSubviews {
-	%orig;
-
-	if (!self.accessibilityLabel) {
-		UIView *parentView = self.superview;
-
-		if (parentView && [parentView class] == [UIView class] && [parentView.accessibilityLabel isEqualToString:@"搜索"]) {
-			self.hidden = YES;
-		}
-
-		else if (parentView && [NSStringFromClass([parentView class]) isEqualToString:@"AWESearchEntryHalfScreenElement"] && [parentView.accessibilityLabel isEqualToString:@"搜索"]) {
-			self.hidden = YES;
-		}
-	}
 }
 %end
 
