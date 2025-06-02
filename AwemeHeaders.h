@@ -10,6 +10,28 @@ typedef NS_ENUM(NSInteger, MediaType) {
   MediaTypeHeic
 };
 
+static __weak UICollectionView *gFeedCV = nil;
+// 音量控制
+@interface AVSystemController : NSObject
++ (instancetype)sharedAVSystemController;
+- (BOOL)setVolumeTo:(float)value forCategory:(NSString *)cat;
+- (float)volumeForCategory:(NSString *)cat;
+@end
+// 亮度控制
+@interface SBHUDController : NSObject
++ (instancetype)sharedInstance;
+- (void)presentHUDWithIcon:(NSString *)name level:(float)level;
+@end
+// 调节模式&全局状态
+typedef NS_ENUM(NSUInteger, DYEdgeMode) {
+  DYEdgeModeNone = 0,
+  DYEdgeModeBrightness = 1,
+  DYEdgeModeVolume = 2,
+};
+static DYEdgeMode gMode = DYEdgeModeNone;
+static CGFloat gStartY = 0.0;
+static CGFloat gStartVal = 0.0;
+
 @interface URLModel : NSObject
 @property(nonatomic, strong) NSArray *originURLList;
 @end
@@ -301,6 +323,10 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @interface AWEUserWorkCollectionViewComponentCell : UICollectionViewCell
 @end
 
+@interface AWELandscapeFeedViewController : UIViewController
+@property(nonatomic, strong) UICollectionView *collectionView;
+@end
+
 @interface AWEFeedRefreshFooter : UIView
 @end
 
@@ -374,9 +400,6 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @property(nonatomic, strong) AWELongPressPanelViewGroupModel *longPressViewGroupModel;
 @property(nonatomic, strong) NSArray *dataArray;
 @property(nonatomic, assign) BOOL isAppearing;
-@end
-
-@interface DYYYSettingViewController : UIViewController
 @end
 
 @interface AWEElementStackView : UIView
@@ -521,7 +544,7 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @property(nonatomic, assign, getter=isHidden) BOOL hidden;
 @end
 
-@interface AWEProfileMixCollectionViewCell : UIView
+@interface AWEProfileMixItemCollectionViewCell : UICollectionViewCell
 @end
 
 @interface AWEProfileTaskCardStyleListCollectionViewCell : UIView
@@ -868,6 +891,9 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @interface AFDButton : UIButton
 @end
 
+@interface AWENoxusHighlightButton : UIButton
+@end
+
 @interface AWEProfileToggleView : UIView
 @end
 
@@ -1058,8 +1084,7 @@ typedef NS_ENUM(NSInteger, MediaType) {
 - (UITapGestureRecognizer *)tapGestureForSubview:(UIView *)subview;
 - (void)openDYYYSettings;
 @end
-@interface AWELeftSideBarViewController : UIViewController
-@end
+
 @interface AWEFeedContainerViewController : UIViewController
 @end
 
@@ -1094,4 +1119,28 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @end
 
 @interface AWEPlayInteractionUserAvatarView : UIView
+@end
+
+@interface AWELeftSideBarViewController : UIViewController <UICollectionViewDelegate, UICollectionViewDataSource>
+- (UICollectionView *)collectionView;
+- (void)adjustContainerViewLayout:(UICollectionViewCell *)cell;
+@end
+
+@interface UIView (Helper)
+- (BOOL)containsClassNamed:(NSString *)className;
+- (UIView *)findViewWithClassName:(NSString *)className;
+@end
+
+@interface AWESettingsTableViewController : AWESettingBaseViewController
+- (id)viewModel;
+- (void)removeAboutSection;
+
+@end
+
+@interface AWEProfileMixCollectionView : UICollectionView
+@property(nonatomic, assign) BOOL fromHome;
+@end
+
+@interface AFDViewedBottomView : UIView
+@property (nonatomic, strong, readonly) UIView *effectView;
 @end
