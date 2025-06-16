@@ -664,6 +664,11 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 		    @"detail" : @"",
 		    @"cellType" : @26,
 		    @"imageName" : @"ic_playertime_outlined_20"},
+		  @{@"identifier" : @"DYYYfilterFeedHDR",
+		    @"title" : @"推荐过滤HDR",
+		    @"detail" : @"",
+		    @"cellType" : @6,
+		    @"imageName" : @"ic_sun_outlined"},
 		  @{@"identifier" : @"DYYYNoAds",
 		    @"title" : @"启用屏蔽广告",
 		    @"detail" : @"",
@@ -688,7 +693,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 		    @"title" : @"视频默认最高画质",
 		    @"detail" : @"",
 		    @"cellType" : @6,
-		    @"imageName" : @"ic_video_outlined_20"},
+		    @"imageName" : @"ic_squaretriangletwo_outlined_20"},
 		  @{@"identifier" : @"DYYYDisableLivePCDN",
 		    @"title" : @"屏蔽直播PCDN功能",
 		    @"detail" : @"",
@@ -720,7 +725,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 								   item.detail = valueString;
 								   [DYYYSettingsHelper refreshTableView];
 							   } else {
-								   DYYYAboutDialogView *errorDialog = [[DYYYAboutDialogView alloc] initWithTitle:@"输入错误" message:@"请输入有效的数字\n\n\n"];
+								   DYYYAboutDialogView *errorDialog = [[DYYYAboutDialogView alloc] initWithTitle:@"输入错误" message:@"\n\n请输入有效的数字\n\n"];
 								   [errorDialog show];
 							   }
 							 }
@@ -1259,7 +1264,12 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 		    @"cellType" : @6,
 		    @"imageName" : @"ic_eyeslash_outlined_16"},
 		  @{@"identifier" : @"DYYYHideSearchEntrance",
-		    @"title" : @"隐藏长框搜索",
+		    @"title" : @"隐藏顶部搜索框",
+		    @"detail" : @"",
+		    @"cellType" : @6,
+		    @"imageName" : @"ic_eyeslash_outlined_16"},
+		  @{@"identifier" : @"DYYYHideSearchEntranceIndicator",
+		    @"title" : @"隐藏搜索指示条",
 		    @"detail" : @"",
 		    @"cellType" : @6,
 		    @"imageName" : @"ic_eyeslash_outlined_16"},
@@ -1435,6 +1445,11 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 		    @"imageName" : @"ic_eyeslash_outlined_16"},
 		  @{@"identifier" : @"DYYYHideReply",
 		    @"title" : @"隐藏私信回复",
+		    @"detail" : @"",
+		    @"cellType" : @6,
+		    @"imageName" : @"ic_eyeslash_outlined_16"},
+		  @{@"identifier" : @"DYYYHidePauseVideoRelatedWord",
+		    @"title" : @"隐藏暂停相关",
 		    @"detail" : @"",
 		    @"cellType" : @6,
 		    @"imageName" : @"ic_eyeslash_outlined_16"}
@@ -2070,12 +2085,14 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 			    if (newValue) {
 				    [DYYYBottomAlertView showAlertWithTitle:@"禁止热更新下发配置"
 					message:@"这将暂停接收测试新功能的推送。确定要继续吗？"
+					avatarURL:nil
 					cancelButtonText:@"取消"
 					confirmButtonText:@"确定"
 					cancelAction:^{
 					  item.isSwitchOn = !newValue;
 					  [DYYYSettingsHelper refreshTableView];
 					}
+					closeAction:nil
 					confirmAction:^{
 					  item.isSwitchOn = newValue;
 					  [DYYYSettingsHelper setUserDefaults:@(newValue) forKey:@"DYYYABTestBlockEnabled"];
@@ -2090,13 +2107,13 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 		  } else if ([item.identifier isEqualToString:@"DYYYABTestModeString"]) {
 			  // 获取当前的模式
 			  NSString *savedMode = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYABTestModeString"];
-			  BOOL isPatchMode = [savedMode isEqualToString:@"覆写模式：保留原设置，覆盖同名项"];
+			  BOOL isPatchMode = ![savedMode isEqualToString:@"替换模式：忽略原配置，写入新数据"];
 			  item.detail = isPatchMode ? @"覆写模式" : @"替换模式";
 
 			  item.cellTappedBlock = ^{
-			    NSString *currentMode = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYABTestModeString"] ?: @"替换模式：清除原配置，写入新数据";
+			    NSString *currentMode = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYABTestModeString"] ?: @"替换模式：忽略原配置，写入新数据";
 
-			    NSArray *modeOptions = @[ @"覆写模式：保留原设置，覆盖同名项", @"替换模式：清除原配置，写入新数据" ];
+			    NSArray *modeOptions = @[ @"覆写模式：保留原设置，覆盖同名项", @"替换模式：忽略原配置，写入新数据" ];
 
 			    [DYYYOptionsSelectionView showWithPreferenceKey:@"DYYYABTestModeString"
 							       optionsArray:modeOptions
@@ -2250,15 +2267,15 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 		  } else if ([item.identifier isEqualToString:@"LoadABTestConfigFile"]) {
 			  item.cellTappedBlock = ^{
 			    NSString *savedMode = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYABTestModeString"];
-			    BOOL isPatchMode = [savedMode isEqualToString:@"覆写模式：保留原设置，覆盖同名项"];
+			    BOOL isPatchMode = ![savedMode isEqualToString:@"替换模式：忽略原配置，写入新数据"];
 
 			    NSString *confirmTitle, *confirmMessage;
 			    if (isPatchMode) {
 				    confirmTitle = @"覆写模式";
-				    confirmMessage = @"覆写模式将保留原设置并覆盖同名项\n确定要继续吗？\n";
+				    confirmMessage = @"\n导入后将保留原设置并覆盖同名项，\n\n点击确定后继续操作。\n";
 			    } else {
 				    confirmTitle = @"替换模式";
-				    confirmMessage = @"替换模式将丢弃原设置并替换为新数据\n确定要继续吗？\n";
+				    confirmMessage = @"\n导入后将忽略原设置并写入新数据，\n\n点击确定后继续操作。\n";
 			    }
 			    DYYYAboutDialogView *confirmDialog = [[DYYYAboutDialogView alloc] initWithTitle:confirmTitle message:confirmMessage];
 			    confirmDialog.onConfirm = ^{
@@ -2966,15 +2983,18 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 	cleanSettingsItem.cellTappedBlock = ^{
 	  [DYYYBottomAlertView showAlertWithTitle:@"清除设置"
 	      message:@"请选择要清除的设置类型"
+	      avatarURL:nil
 	      cancelButtonText:@"清除抖音设置"
 	      confirmButtonText:@"清除插件设置"
 	      cancelAction:^{
 		// 清除抖音设置的确认对话框
 		[DYYYBottomAlertView showAlertWithTitle:@"清除抖音设置"
 						message:@"确定要清除抖音所有设置吗？\n这将无法恢复，应用会自动退出！"
+					      avatarURL:nil
 				       cancelButtonText:@"取消"
 				      confirmButtonText:@"确定"
 					   cancelAction:nil
+					    closeAction:nil
 					  confirmAction:^{
 					    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES);
 					    if (paths.count > 0) {
@@ -2997,13 +3017,17 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 					    }
 					  }];
 	      }
+	      closeAction:^{
+	      }
 	      confirmAction:^{
 		// 清除插件设置的确认对话框
 		[DYYYBottomAlertView showAlertWithTitle:@"清除插件设置"
 						message:@"确定要清除所有插件设置吗？\n这将无法恢复！"
+					      avatarURL:nil
 				       cancelButtonText:@"取消"
 				      confirmButtonText:@"确定"
 					   cancelAction:nil
+					    closeAction:nil
 					  confirmAction:^{
 					    // 获取所有以DYYY开头的NSUserDefaults键值并清除
 					    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
@@ -3015,8 +3039,6 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 						    }
 					    }
 					    [defaults synchronize];
-
-					    // 显示成功提示
 					    [DYYYManager showToast:@"插件设置已清除，请重启应用"];
 					  }];
 	      }];
@@ -3035,9 +3057,11 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 	cleanCacheItem.cellTappedBlock = ^{
 	  [DYYYBottomAlertView showAlertWithTitle:@"清理缓存"
 					  message:@"确定要清理缓存吗？\n这将删除临时文件和缓存"
+					avatarURL:nil
 				 cancelButtonText:@"取消"
 				confirmButtonText:@"确定"
 				     cancelAction:nil
+				      closeAction:nil
 				    confirmAction:^{
 				      NSFileManager *fileManager = [NSFileManager defaultManager];
 				      NSUInteger totalSize = 0;
