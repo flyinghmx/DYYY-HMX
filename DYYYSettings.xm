@@ -610,6 +610,16 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 	  // 【杂项设置】分类
 	  NSMutableArray<AWESettingItemModel *> *miscellaneousItems = [NSMutableArray array];
 	  NSArray *miscellaneousSettings = @[
+		  @{@"identifier" : @"DYYYEnableLiveHighestQuality",
+		    @"title" : @"直播默认最高画质",
+		    @"detail" : @"",
+		    @"cellType" : @6,
+		    @"imageName" : @"ic_video_outlined_20"},
+		  @{@"identifier" : @"DYYYEnableVideoHighestQuality",
+		    @"title" : @"视频默认最高画质",
+		    @"detail" : @"",
+		    @"cellType" : @6,
+		    @"imageName" : @"ic_squaretriangletwo_outlined_20"},
 		  @{@"identifier" : @"DYYYisHideStatusbar",
 		    @"title" : @"隐藏系统顶栏",
 		    @"detail" : @"",
@@ -669,6 +679,11 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 		    @"detail" : @"",
 		    @"cellType" : @6,
 		    @"imageName" : @"ic_sun_outlined"},
+		  @{@"identifier" : @"DYYYfilterProp",
+		    @"title" : @"推荐过滤拍同款",
+		    @"detail" : @"",
+		    @"cellType" : @26,
+		    @"imageName" : @"ic_tag_outlined_20"},
 		  @{@"identifier" : @"DYYYNoAds",
 		    @"title" : @"启用屏蔽广告",
 		    @"detail" : @"",
@@ -684,16 +699,6 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 		    @"detail" : @"",
 		    @"cellType" : @6,
 		    @"imageName" : @"ic_circletop_outlined"},
-		  @{@"identifier" : @"DYYYEnableLiveHighestQuality",
-		    @"title" : @"直播默认最高画质",
-		    @"detail" : @"",
-		    @"cellType" : @6,
-		    @"imageName" : @"ic_video_outlined_20"},
-		  @{@"identifier" : @"DYYYEnableVideoHighestQuality",
-		    @"title" : @"视频默认最高画质",
-		    @"detail" : @"",
-		    @"cellType" : @6,
-		    @"imageName" : @"ic_squaretriangletwo_outlined_20"},
 		  @{@"identifier" : @"DYYYDisableLivePCDN",
 		    @"title" : @"屏蔽直播PCDN功能",
 		    @"detail" : @"",
@@ -778,6 +783,22 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 							   [DYYYSettingsHelper refreshTableView];
 							 }
 							  onCancel:nil];
+			  };
+		  } else if ([item.identifier isEqualToString:@"DYYYfilterProp"]) {
+			  NSString *savedValue = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterProp"];
+			  item.detail = savedValue ?: @"";
+			  item.cellTappedBlock = ^{
+			    NSString *savedKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterProp"] ?: @"";
+			    NSArray *keywordArray = [savedKeywords length] > 0 ? [savedKeywords componentsSeparatedByString:@","] : @[];
+			    DYYYKeywordListView *keywordListView = [[DYYYKeywordListView alloc] initWithTitle:@"设置过滤词（支持部分匹配）" keywords:keywordArray];
+			    keywordListView.onConfirm = ^(NSArray *keywords) {
+			      NSString *keywordString = [keywords componentsJoinedByString:@","];
+
+			      [DYYYSettingsHelper setUserDefaults:keywordString forKey:@"DYYYfilterProp"];
+			      item.detail = keywordString;
+			      [DYYYSettingsHelper refreshTableView];
+			    };
+			    [keywordListView show];
 			  };
 		  }
 		  [filterItems addObject:item];
