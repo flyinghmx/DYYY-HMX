@@ -98,9 +98,8 @@ static CGFloat gStartVal = 0.0;
 @end
 
 @interface AWEPropGuideV2Model : NSObject
-@property (nonatomic, copy) NSString *propName;
+@property(nonatomic, copy) NSString *propName;
 @end
-
 
 @interface AWEAwemeModel : NSObject
 @property(nonatomic, strong, readwrite) NSNumber *createTime;
@@ -210,6 +209,7 @@ static CGFloat gStartVal = 0.0;
 
 @interface AWEPlayInteractionViewController : UIViewController
 @property(nonatomic, strong) UIView *view;
+@property (nonatomic, strong) AWEAwemeModel *model;
 @property(nonatomic, strong) NSString *referString;
 @property(nonatomic, assign) BOOL isCommentVCShowing;
 - (void)performCommentAction;
@@ -365,6 +365,9 @@ static CGFloat gStartVal = 0.0;
 @end
 
 @interface AWETemplatePlayletView : UIView
+@end
+
+@interface AFDRecommendToFriendTagView : UIView
 @end
 
 @interface AFDRecommendToFriendEntranceLabel : UILabel
@@ -763,9 +766,6 @@ static CGFloat gStartVal = 0.0;
 @interface AWESearchFeedTagView : UIView
 @end
 
-@interface AFDRecommendToFriendTagView : UIView
-@end
-
 @interface AFDAIbumFolioView : UIView
 @end
 
@@ -930,7 +930,7 @@ static CGFloat gStartVal = 0.0;
 @property(assign, nonatomic) UIEdgeInsets lockImageInset;
 @property(retain, nonatomic) UIImage *lockImage;
 @property(retain, nonatomic) UIImage *closeImage;
-@property(retain, nonatomic) AFDButton *cancelButton; 
+@property(retain, nonatomic) AFDButton *cancelButton;
 @property(retain, nonatomic) AWEButton *knownButton;
 @property(retain, nonatomic) AWEButton *leftCancelButton;
 @property(retain, nonatomic) AWEButton *rightConfirmButton;
@@ -1225,11 +1225,18 @@ static CGFloat gStartVal = 0.0;
 @end
 
 @interface AWEFeedPauseRelatedWordComponent : NSObject
-@property (nonatomic, strong) AWEFeedPauseVideoRelatedWordView *relatedView;
-@property (nonatomic, strong) AWEAwemeModel *currentAweme;
-@property (nonatomic, assign) long long pauseContentNum;
+@property(nonatomic, strong) AWEFeedPauseVideoRelatedWordView *relatedView;
+@property(nonatomic, strong) AWEAwemeModel *currentAweme;
+@property(nonatomic, assign) long long pauseContentNum;
 
 @end
 
 @interface YYAnimatedImageView : UIImageView
+@end
+
+@interface AWEProfileMentionLabel : UILabel
+@property(copy, nonatomic) NSString *text;
+@end
+
+@interface MTKView : UIView
 @end

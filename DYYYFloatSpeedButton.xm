@@ -1,6 +1,6 @@
 #import "AwemeHeaders.h"
 #import "DYYYFloatSpeedButton.h"
-#import "DYYYManager.h"
+#import "DYYYUtils.h"
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
@@ -12,7 +12,6 @@ static BOOL showSpeedX = NO;
 static CGFloat speedButtonSize = 32.0;
 static BOOL isFloatSpeedButtonEnabled = NO;
 static BOOL isForceHidden = NO;
-static BOOL isAppActive = YES;
 static BOOL isInteractionViewVisible = NO;
 
 NSArray *getSpeedOptions() {
@@ -92,9 +91,7 @@ NSArray *findViewControllersInHierarchy(UIViewController *rootViewController) {
 	return viewControllers;
 }
 
-void showSpeedButton(void) {
-	isForceHidden = NO;
-}
+void showSpeedButton(void) { isForceHidden = NO; }
 
 void hideSpeedButton(void) {
 	isForceHidden = YES;
@@ -105,32 +102,22 @@ void hideSpeedButton(void) {
 	}
 }
 
-void toggleSpeedButtonVisibility(void) {
-	if (speedButton) {
-		if (speedButton.hidden) {
-			showSpeedButton();
-		} else {
-			hideSpeedButton();
-		}
-	}
-}
-
 void updateSpeedButtonVisibility() {
-    if (!speedButton || !isFloatSpeedButtonEnabled || !isAppActive)
-        return;
-    
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (!isInteractionViewVisible) {
-            speedButton.hidden = YES;
-            return;
-        }
-        
-        // 在交互界面时，根据评论界面状态决定是否显示
-        BOOL shouldHide = isCommentViewVisible || isForceHidden;
-        if (speedButton.hidden != shouldHide) {
-            speedButton.hidden = shouldHide;
-        }
-    });
+	if (!speedButton || !isFloatSpeedButtonEnabled)
+		return;
+
+	dispatch_async(dispatch_get_main_queue(), ^{
+	  if (!isInteractionViewVisible) {
+		  speedButton.hidden = YES;
+		  return;
+	  }
+
+	  // 在交互界面时，根据评论界面状态决定是否显示
+	  BOOL shouldHide = isCommentViewVisible || isForceHidden;
+	  if (speedButton.hidden != shouldHide) {
+		  speedButton.hidden = shouldHide;
+	  }
+	});
 }
 
 @interface UIView (SpeedHelper)
@@ -253,7 +240,7 @@ void updateSpeedButtonVisibility() {
 	self.justToggledLock = YES;
 
 	NSString *toastMessage = self.isLocked ? @"按钮已锁定" : @"按钮已解锁";
-	[DYYYManager showToast:toastMessage];
+	[DYYYUtils showToast:toastMessage];
 
 	if (self.isLocked) {
 		[self saveButtonPosition];
@@ -466,30 +453,18 @@ void updateSpeedButtonVisibility() {
 
 %end
 
-
 %hook AWECommentContainerViewController
 
-- (void)viewWillAppear:(BOOL)animated {
-    %orig;
-    isCommentViewVisible = YES;
-    updateSpeedButtonVisibility();
-}
-
 - (void)viewDidAppear:(BOOL)animated {
-    %orig;
-    isCommentViewVisible = YES;
-    updateSpeedButtonVisibility();
-}
-
-- (void)viewWillDisappear:(BOOL)animated {
-    %orig;
-    updateSpeedButtonVisibility();
+	%orig;
+	isCommentViewVisible = YES;
+	updateSpeedButtonVisibility();
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
-    %orig;
-    isCommentViewVisible = NO;
-    updateSpeedButtonVisibility();
+	%orig;
+	isCommentViewVisible = NO;
+	updateSpeedButtonVisibility();
 }
 
 %end
@@ -497,13 +472,10 @@ void updateSpeedButtonVisibility() {
 %hook AWEPlayInteractionViewController
 
 - (void)viewDidAppear:(BOOL)animated {
-    %orig;
-    isInteractionViewVisible = YES;
-    
-    dispatch_async(dispatch_get_main_queue(), ^{
-        isCommentViewVisible = self.isCommentVCShowing;
-        updateSpeedButtonVisibility();
-    });
+	%orig;
+	isInteractionViewVisible = YES;
+	isCommentViewVisible = self.isCommentVCShowing;
+	updateSpeedButtonVisibility();
 }
 
 - (void)viewDidLayoutSubviews {
@@ -545,14 +517,15 @@ void updateSpeedButtonVisibility() {
 		[keyWindow addSubview:speedButton];
 		[speedButton loadSavedPosition];
 	}
-    
-    updateSpeedButtonVisibility();
+	isCommentViewVisible = self.isCommentVCShowing;
+	updateSpeedButtonVisibility();
 }
 
-- (void)viewWillDisappear:(BOOL)animated {
+- (void)viewDidDisappear:(BOOL)animated {
 	%orig;
 	isInteractionViewVisible = NO;
-    updateSpeedButtonVisibility();
+	isCommentViewVisible = self.isCommentVCShowing;
+	updateSpeedButtonVisibility();
 }
 
 %new
@@ -627,7 +600,7 @@ void updateSpeedButtonVisibility() {
 	}
 
 	if (!speedApplied) {
-		[DYYYManager showToast:@"无法找到视频控制器"];
+		[DYYYUtils showToast:@"无法找到视频控制器"];
 	}
 }
 
@@ -663,14 +636,13 @@ void updateSpeedButtonVisibility() {
 		dispatch_async(dispatch_get_main_queue(), ^{
 		  [self addSubview:speedButton];
 		  [speedButton loadSavedPosition];
-		  updateSpeedButtonVisibility();
 		});
 	}
 }
 %end
 
 %ctor {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    isFloatSpeedButtonEnabled = [defaults boolForKey:@"DYYYEnableFloatSpeedButton"];
-    %init;
+	NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+	isFloatSpeedButtonEnabled = [defaults boolForKey:@"DYYYEnableFloatSpeedButton"];
+	%init;
 }

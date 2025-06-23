@@ -18,6 +18,45 @@
 #import "DYYYToast.h"
 #import "DYYYUtils.h"
 
+// 长按复制个人简介
+%hook AWEProfileMentionLabel
+
+- (void)layoutSubviews {
+	%orig;
+
+	if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYBioCopyText"]) {
+		return;
+	}
+
+	BOOL hasLongPressGesture = NO;
+	for (UIGestureRecognizer *gesture in self.gestureRecognizers) {
+		if ([gesture isKindOfClass:[UILongPressGestureRecognizer class]]) {
+			hasLongPressGesture = YES;
+			break;
+		}
+	}
+
+	if (!hasLongPressGesture) {
+		UILongPressGestureRecognizer *longPressGesture = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
+		longPressGesture.minimumPressDuration = 0.5;
+		[self addGestureRecognizer:longPressGesture];
+		self.userInteractionEnabled = YES;
+	}
+}
+
+%new
+- (void)handleLongPress:(UILongPressGestureRecognizer *)gesture {
+	if (gesture.state == UIGestureRecognizerStateBegan) {
+		NSString *bioText = self.text;
+		if (bioText && bioText.length > 0) {
+			[[UIPasteboard generalPasteboard] setString:bioText];
+			[DYYYToast showSuccessToastWithMessage:@"个人简介已复制"];
+		}
+	}
+}
+
+%end
+
 // 默认视频流最高画质
 %hook AWEVideoModel
 
@@ -442,7 +481,7 @@
 			timer = nil;
 		}
 		void (^tryFindAndSetPureMode)(void) = ^{
-		  UIWindow *keyWindow = [DYYYManager getActiveWindow];
+		  UIWindow *keyWindow = [DYYYUtils getActiveWindow];
 		  if (keyWindow && keyWindow.rootViewController) {
 			  UIViewController *feedVC = [self findViewController:keyWindow.rootViewController ofClass:NSClassFromString(@"AWEFeedTableViewController")];
 			  if (feedVC) {
@@ -800,7 +839,7 @@
 			}
 		}
 
-		BOOL isDarkMode = [DYYYManager isDarkMode];
+		BOOL isDarkMode = [DYYYUtils isDarkMode];
 
 		UIBlurEffectStyle blurStyle = isDarkMode ? UIBlurEffectStyleDark : UIBlurEffectStyleLight;
 
@@ -1030,14 +1069,6 @@ static CGFloat rightLabelRightMargin = -1;
 		BOOL showLeftCompleteTime = [scheduleStyle isEqualToString:@"进度条左侧完整"];
 
 		NSString *labelColorHex = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYProgressLabelColor"];
-		UIColor *labelColor = [UIColor whiteColor];
-		if (labelColorHex && labelColorHex.length > 0) {
-			SEL colorSelector = NSSelectorFromString(@"colorWithHexString:");
-			Class dyyyManagerClass = NSClassFromString(@"DYYYManager");
-			if (dyyyManagerClass && [dyyyManagerClass respondsToSelector:colorSelector]) {
-				labelColor = [dyyyManagerClass performSelector:colorSelector withObject:labelColorHex];
-			}
-		}
 
 		CGFloat labelYPosition = sliderOriginalFrameInParent.origin.y + verticalOffset;
 		CGFloat labelHeight = 15.0;
@@ -1046,7 +1077,6 @@ static CGFloat rightLabelRightMargin = -1;
 		if (!showRemainingTime && !showCompleteTime) {
 			UILabel *leftLabel = [[UILabel alloc] init];
 			leftLabel.backgroundColor = [UIColor clearColor];
-			leftLabel.textColor = labelColor;
 			leftLabel.font = labelFont;
 			leftLabel.tag = 10001;
 			if (showLeftRemainingTime)
@@ -1064,12 +1094,13 @@ static CGFloat rightLabelRightMargin = -1;
 
 			leftLabel.frame = CGRectMake(leftLabelLeftMargin, labelYPosition, leftLabel.frame.size.width, labelHeight);
 			[parentView addSubview:leftLabel];
+
+			[DYYYUtils applyColorSettingsToLabel:leftLabel colorHexString:labelColorHex];
 		}
 
 		if (!showLeftRemainingTime && !showLeftCompleteTime) {
 			UILabel *rightLabel = [[UILabel alloc] init];
 			rightLabel.backgroundColor = [UIColor clearColor];
-			rightLabel.textColor = labelColor;
 			rightLabel.font = labelFont;
 			rightLabel.tag = 10002;
 			if (showRemainingTime)
@@ -1087,6 +1118,8 @@ static CGFloat rightLabelRightMargin = -1;
 
 			rightLabel.frame = CGRectMake(rightLabelRightMargin, labelYPosition, rightLabel.frame.size.width, labelHeight);
 			[parentView addSubview:rightLabel];
+
+			[DYYYUtils applyColorSettingsToLabel:rightLabel colorHexString:labelColorHex];
 		}
 
 		[self setNeedsLayout];
@@ -1130,14 +1163,7 @@ static CGFloat rightLabelRightMargin = -1;
 		UILabel *rightLabel = [parentView viewWithTag:10002];
 
 		NSString *labelColorHex = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYProgressLabelColor"];
-		UIColor *labelColor = [UIColor whiteColor];
-		if (labelColorHex && labelColorHex.length > 0) {
-			SEL colorSelector = NSSelectorFromString(@"colorWithHexString:");
-			Class dyyyManagerClass = NSClassFromString(@"DYYYManager");
-			if (dyyyManagerClass && [dyyyManagerClass respondsToSelector:colorSelector]) {
-				labelColor = [dyyyManagerClass performSelector:colorSelector withObject:labelColorHex];
-			}
-		}
+
 		NSString *scheduleStyle = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYScheduleStyle"];
 		BOOL showRemainingTime = [scheduleStyle isEqualToString:@"进度条右侧剩余"];
 		BOOL showCompleteTime = [scheduleStyle isEqualToString:@"进度条右侧完整"];
@@ -1165,7 +1191,7 @@ static CGFloat rightLabelRightMargin = -1;
 				leftFrame.size.height = 15.0;
 				leftLabel.frame = leftFrame;
 			}
-			leftLabel.textColor = labelColor;
+			[DYYYUtils applyColorSettingsToLabel:leftLabel colorHexString:labelColorHex];
 		}
 
 		// 更新右标签
@@ -1189,7 +1215,7 @@ static CGFloat rightLabelRightMargin = -1;
 				rightFrame.size.height = 15.0;
 				rightLabel.frame = rightFrame;
 			}
-			rightLabel.textColor = labelColor;
+			[DYYYUtils applyColorSettingsToLabel:leftLabel colorHexString:labelColorHex];
 		}
 	}
 }
@@ -1266,12 +1292,16 @@ static CGFloat rightLabelRightMargin = -1;
 	}
 }
 %end
-
 %hook AWEPlayInteractionTimestampElement
+
 - (id)timestampLabel {
 	UILabel *label = %orig;
+	NSString *labelColorHex = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYLabelColor"];
+	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnabsuijiyanse"]) {
+		labelColorHex = @"random_rainbow";
+	}
 	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"]) {
-		NSString *text = label.text;
+		NSString *originalText = label.text ?: @"";
 		NSString *cityCode = self.model.cityCode;
 
 		if (cityCode.length > 0) {
@@ -1332,22 +1362,25 @@ static CGFloat rightLabelRightMargin = -1;
 					}
 
 					dispatch_async(dispatch_get_main_queue(), ^{
-					  NSString *currentText = label.text ?: @"";
-
-					  if ([currentText containsString:@"IP属地："]) {
-						  NSRange range = [currentText rangeOfString:@"IP属地："];
+					  NSString *currentLabelText = label.text ?: @"";
+					  if ([currentLabelText containsString:@"IP属地："]) {
+						  NSRange range = [currentLabelText rangeOfString:@"IP属地："];
 						  if (range.location != NSNotFound) {
-							  NSString *baseText = [currentText substringToIndex:range.location];
-							  if (![currentText containsString:displayLocation]) {
+							  NSString *baseText = [currentLabelText substringToIndex:range.location];
+							  if (![currentLabelText containsString:displayLocation]) {
 								  label.text = [NSString stringWithFormat:@"%@IP属地：%@", baseText, displayLocation];
 							  }
 						  }
 					  } else {
-						  NSString *baseText = label.text ?: @"";
-						  if (baseText.length > 0) {
-							  label.text = [NSString stringWithFormat:@"%@  IP属地：%@", baseText, displayLocation];
+						  if (currentLabelText.length > 0 && ![displayLocation isEqualToString:@"未知"]) {
+							  label.text = [NSString stringWithFormat:@"%@  IP属地：%@", currentLabelText, displayLocation];
+						  } else if (![displayLocation isEqualToString:@"未知"]) {
+							  label.text = [NSString stringWithFormat:@"IP属地：%@", displayLocation];
 						  }
 					  }
+
+					  [DYYYUtils applyColorSettingsToLabel:label colorHexString:labelColorHex];
+					  ;
 					});
 				} else {
 					[CityManager
@@ -1388,51 +1421,46 @@ static CGFloat rightLabelRightMargin = -1;
 							       }
 
 							       dispatch_async(dispatch_get_main_queue(), ^{
-								 NSString *currentText = label.text ?: @"";
+								 NSString *currentLabelText = label.text ?: @"";
 
-								 if ([currentText containsString:@"IP属地："]) {
-									 NSRange range = [currentText rangeOfString:@"IP属地："];
+								 if ([currentLabelText containsString:@"IP属地："]) {
+									 NSRange range = [currentLabelText rangeOfString:@"IP属地："];
 									 if (range.location != NSNotFound) {
-										 NSString *baseText = [currentText substringToIndex:range.location];
-										 if (![currentText containsString:displayLocation]) {
+										 NSString *baseText = [currentLabelText substringToIndex:range.location];
+										 if (![currentLabelText containsString:displayLocation]) {
 											 label.text = [NSString stringWithFormat:@"%@IP属地：%@", baseText, displayLocation];
 										 }
 									 }
 								 } else {
-									 NSString *baseText = label.text ?: @"";
-									 if (baseText.length > 0) {
-										 label.text = [NSString stringWithFormat:@"%@  IP属地：%@", baseText, displayLocation];
+									 if (currentLabelText.length > 0 && ![displayLocation isEqualToString:@"未知"]) {
+										 label.text = [NSString stringWithFormat:@"%@  IP属地：%@", currentLabelText, displayLocation];
+									 } else if (![displayLocation isEqualToString:@"未知"]) {
+										 label.text = [NSString stringWithFormat:@"IP属地：%@", displayLocation];
 									 }
 								 }
+
+								 [DYYYUtils applyColorSettingsToLabel:label colorHexString:labelColorHex];
+								 ;
 							       });
 						       }
 						     }];
 				}
-			} else if (![text containsString:cityName]) {
+			} else if (![originalText containsString:cityName]) {
+				BOOL isDirectCity = [provinceName isEqualToString:cityName] ||
+						    ([cityCode hasPrefix:@"11"] || [cityCode hasPrefix:@"12"] || [cityCode hasPrefix:@"31"] || [cityCode hasPrefix:@"50"]);
 				if (!self.model.ipAttribution) {
-					BOOL isDirectCity = [provinceName isEqualToString:cityName] ||
-							    ([cityCode hasPrefix:@"11"] || [cityCode hasPrefix:@"12"] || [cityCode hasPrefix:@"31"] || [cityCode hasPrefix:@"50"]);
-
 					if (isDirectCity) {
-						label.text = [NSString stringWithFormat:@"%@  IP属地：%@", text, cityName];
+						label.text = [NSString stringWithFormat:@"%@  IP属地：%@", originalText, cityName];
 					} else {
-						label.text = [NSString stringWithFormat:@"%@  IP属地：%@ %@", text, provinceName, cityName];
+						label.text = [NSString stringWithFormat:@"%@  IP属地：%@ %@", originalText, provinceName, cityName];
 					}
 				} else {
-					BOOL isDirectCity = [provinceName isEqualToString:cityName] ||
-							    ([cityCode hasPrefix:@"11"] || [cityCode hasPrefix:@"12"] || [cityCode hasPrefix:@"31"] || [cityCode hasPrefix:@"50"]);
-
-					BOOL containsProvince = [text containsString:provinceName];
-					if (containsProvince && !isDirectCity) {
-						label.text = [NSString stringWithFormat:@"%@ %@", text, cityName];
-					} else if (containsProvince && isDirectCity) {
-						label.text = [NSString stringWithFormat:@"%@  IP属地：%@", text, cityName];
-					} else if (isDirectCity && containsProvince) {
-						label.text = text;
-					} else if (containsProvince) {
-						label.text = [NSString stringWithFormat:@"%@ %@", text, cityName];
-					} else {
-						label.text = text;
+					BOOL containsProvince = [originalText containsString:provinceName];
+					BOOL containsCity = [originalText containsString:cityName];
+					if (containsProvince && !isDirectCity && !containsCity) {
+						label.text = [NSString stringWithFormat:@"%@ %@", originalText, cityName];
+					} else if (isDirectCity && !containsCity) {
+						label.text = [NSString stringWithFormat:@"%@  IP属地：%@", originalText, cityName];
 					}
 				}
 			}
@@ -1454,60 +1482,10 @@ static CGFloat rightLabelRightMargin = -1;
 
 		label.font = originalFont;
 	}
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnabsuijiyanse"]) {
-		UIColor *color1 = [UIColor colorWithRed:(CGFloat)arc4random_uniform(256) / 255.0
-						  green:(CGFloat)arc4random_uniform(256) / 255.0
-						   blue:(CGFloat)arc4random_uniform(256) / 255.0
-						  alpha:1.0];
-		UIColor *color2 = [UIColor colorWithRed:(CGFloat)arc4random_uniform(256) / 255.0
-						  green:(CGFloat)arc4random_uniform(256) / 255.0
-						   blue:(CGFloat)arc4random_uniform(256) / 255.0
-						  alpha:1.0];
-		UIColor *color3 = [UIColor colorWithRed:(CGFloat)arc4random_uniform(256) / 255.0
-						  green:(CGFloat)arc4random_uniform(256) / 255.0
-						   blue:(CGFloat)arc4random_uniform(256) / 255.0
-						  alpha:1.0];
 
-		NSMutableAttributedString *attributedText = [[NSMutableAttributedString alloc] initWithString:label.text];
-		CFIndex length = [attributedText length];
-		for (CFIndex i = 0; i < length; i++) {
-			CGFloat progress = (CGFloat)i / (length == 0 ? 1 : length - 1);
+	[DYYYUtils applyColorSettingsToLabel:label colorHexString:labelColorHex];
+	;
 
-			UIColor *startColor;
-			UIColor *endColor;
-			CGFloat subProgress;
-
-			if (progress < 0.5) {
-				startColor = color1;
-				endColor = color2;
-				subProgress = progress * 2;
-			} else {
-				startColor = color2;
-				endColor = color3;
-				subProgress = (progress - 0.5) * 2;
-			}
-
-			CGFloat startRed, startGreen, startBlue, startAlpha;
-			CGFloat endRed, endGreen, endBlue, endAlpha;
-			[startColor getRed:&startRed green:&startGreen blue:&startBlue alpha:&startAlpha];
-			[endColor getRed:&endRed green:&endGreen blue:&endBlue alpha:&endAlpha];
-
-			CGFloat red = startRed + (endRed - startRed) * subProgress;
-			CGFloat green = startGreen + (endGreen - startGreen) * subProgress;
-			CGFloat blue = startBlue + (endBlue - startBlue) * subProgress;
-			CGFloat alpha = startAlpha + (endAlpha - startAlpha) * subProgress;
-
-			UIColor *currentColor = [UIColor colorWithRed:red green:green blue:blue alpha:alpha];
-			[attributedText addAttribute:NSForegroundColorAttributeName value:currentColor range:NSMakeRange(i, 1)];
-		}
-
-		label.attributedText = attributedText;
-	} else {
-		NSString *labelColor = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYLabelColor"];
-		if (labelColor.length > 0) {
-			label.textColor = [DYYYManager colorWithHexString:labelColor];
-		}
-	}
 	return label;
 }
 
@@ -1548,9 +1526,79 @@ static CGFloat rightLabelRightMargin = -1;
 // 对新版文案的偏移（33.0以上）
 %hook AWEPlayInteractionDescriptionLabel
 
-- (void)layoutSubviews {
+static char kLongPressGestureKey;
+static NSString *const kDYYYLongPressCopyEnabledKey = @"DYYYLongPressCopyTextEnabled";
+
+- (void)didMoveToWindow {
 	%orig;
 
+	BOOL longPressCopyEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:kDYYYLongPressCopyEnabledKey];
+
+	if (![[NSUserDefaults standardUserDefaults] objectForKey:kDYYYLongPressCopyEnabledKey]) {
+		longPressCopyEnabled = NO;
+		[[NSUserDefaults standardUserDefaults] setBool:NO forKey:kDYYYLongPressCopyEnabledKey];
+		[[NSUserDefaults standardUserDefaults] synchronize];
+	}
+
+	UIGestureRecognizer *existingGesture = objc_getAssociatedObject(self, &kLongPressGestureKey);
+	if (existingGesture && !longPressCopyEnabled) {
+		[self removeGestureRecognizer:existingGesture];
+		objc_setAssociatedObject(self, &kLongPressGestureKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+		return;
+	}
+
+	if (longPressCopyEnabled && !objc_getAssociatedObject(self, &kLongPressGestureKey)) {
+		UILongPressGestureRecognizer *highPriorityLongPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleHighPriorityLongPress:)];
+		highPriorityLongPress.minimumPressDuration = 0.3;
+
+		[self addGestureRecognizer:highPriorityLongPress];
+
+		UIView *currentView = self;
+		while (currentView.superview) {
+			currentView = currentView.superview;
+
+			for (UIGestureRecognizer *recognizer in currentView.gestureRecognizers) {
+				if ([recognizer isKindOfClass:[UILongPressGestureRecognizer class]] || [recognizer isKindOfClass:[UIPinchGestureRecognizer class]]) {
+					[recognizer requireGestureRecognizerToFail:highPriorityLongPress];
+				}
+			}
+		}
+
+		objc_setAssociatedObject(self, &kLongPressGestureKey, highPriorityLongPress, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+	}
+}
+
+%new
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+	if ([gestureRecognizer.view isEqual:self] && [gestureRecognizer isKindOfClass:[UILongPressGestureRecognizer class]]) {
+		return NO;
+	}
+	return YES;
+}
+
+%new
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldBeRequiredToFailByGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+	if ([gestureRecognizer.view isEqual:self] && [gestureRecognizer isKindOfClass:[UILongPressGestureRecognizer class]]) {
+		return YES;
+	}
+	return NO;
+}
+
+%new
+- (void)handleHighPriorityLongPress:(UILongPressGestureRecognizer *)gestureRecognizer {
+	if (gestureRecognizer.state == UIGestureRecognizerStateBegan) {
+
+		NSString *description = self.text;
+
+		if (description.length > 0) {
+			[[UIPasteboard generalPasteboard] setString:description];
+			[DYYYToast showSuccessToastWithMessage:@"视频文案已复制"];
+		}
+	}
+}
+
+- (void)layoutSubviews {
+	%orig;
 	self.transform = CGAffineTransformIdentity;
 
 	NSString *descriptionOffsetValue = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYDescriptionVerticalOffset"];
@@ -1805,7 +1853,7 @@ static CGFloat rightLabelRightMargin = -1;
 		}
 	}
 
-	BOOL isDarkMode = [DYYYManager isDarkMode];
+	BOOL isDarkMode = [DYYYUtils isDarkMode];
 	UIBlurEffectStyle blurStyle = isDarkMode ? UIBlurEffectStyleDark : UIBlurEffectStyleLight;
 	UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:blurStyle];
 	UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
@@ -2013,7 +2061,7 @@ static CGFloat rightLabelRightMargin = -1;
 %hook AWELongPressPanelABSettings
 + (NSUInteger)modernLongPressPanelStyleMode {
 	if (DYYYGetBool(@"DYYYModernPanelFollowSystem")) {
-		BOOL isDarkMode = [DYYYManager isDarkMode];
+		BOOL isDarkMode = [DYYYUtils isDarkMode];
 		return isDarkMode ? 1 : 2;
 	} else if (DYYYGetBool(@"DYYYisEnableModernLight")) {
 		return 2;
@@ -2027,7 +2075,7 @@ static CGFloat rightLabelRightMargin = -1;
 %hook AWEModernLongPressPanelUIConfig
 + (NSUInteger)modernLongPressPanelStyleMode {
 	if (DYYYGetBool(@"DYYYModernPanelFollowSystem")) {
-		BOOL isDarkMode = [DYYYManager isDarkMode];
+		BOOL isDarkMode = [DYYYUtils isDarkMode];
 		return isDarkMode ? 1 : 2;
 	} else if (DYYYGetBool(@"DYYYisEnableModernLight")) {
 		return 2;
@@ -2307,9 +2355,9 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
 								       handler:^(__kindof UIAction *_Nonnull action) {
 									 // 使用全局变量 targetStickerView 保存当前长按的表情
 									 if (targetStickerView) {
-										 [DYYYUtils saveAnimatedSticker:targetStickerView];
+										 [DYYYManager saveAnimatedSticker:targetStickerView];
 									 } else {
-										 [DYYYManager showToast:@"无法获取表情视图"];
+										 [DYYYUtils showToast:@"无法获取表情视图"];
 									 }
 								       }];
 
@@ -2365,7 +2413,7 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
 	// 获取表情包URL
 	AWEIMEmoticonModel *emoticonModel = self.model;
 	if (!emoticonModel) {
-		[DYYYManager showToast:@"无法获取表情包信息"];
+		[DYYYUtils showToast:@"无法获取表情包信息"];
 		return;
 	}
 
@@ -2389,7 +2437,7 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
 	}
 
 	if (!urlString) {
-		[DYYYManager showToast:@"无法获取表情包链接"];
+		[DYYYUtils showToast:@"无法获取表情包链接"];
 		return;
 	}
 
@@ -3246,84 +3294,6 @@ static AWEIMReusableCommonCell *currentCell;
 }
 %end
 
-%hook AWENormalModeTabBar
-
-- (void)layoutSubviews {
-	%orig;
-
-	BOOL hideShop = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideShopButton"];
-	BOOL hideMsg = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideMessageButton"];
-	BOOL hideFri = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideFriendsButton"];
-	BOOL hideMe = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideMyButton"];
-
-	NSMutableArray *visibleButtons = [NSMutableArray array];
-	Class generalButtonClass = %c(AWENormalModeTabBarGeneralButton);
-	Class plusButtonClass = %c(AWENormalModeTabBarGeneralPlusButton);
-
-	for (UIView *subview in self.subviews) {
-		if (![subview isKindOfClass:generalButtonClass] && ![subview isKindOfClass:plusButtonClass])
-			continue;
-
-		NSString *label = subview.accessibilityLabel;
-		BOOL shouldHide = NO;
-
-		if ([label isEqualToString:@"商城"]) {
-			shouldHide = hideShop;
-		} else if ([label containsString:@"消息"]) {
-			shouldHide = hideMsg;
-		} else if ([label containsString:@"朋友"]) {
-			shouldHide = hideFri;
-		} else if ([label containsString:@"我"]) {
-			shouldHide = hideMe;
-		}
-
-		if (!shouldHide) {
-			[visibleButtons addObject:subview];
-		} else {
-			[subview removeFromSuperview];
-		}
-	}
-
-	[visibleButtons sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
-	  return [@(a.frame.origin.x) compare:@(b.frame.origin.x)];
-	}];
-
-	if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
-		// iPad端布局逻辑
-		UIView *targetView = nil;
-		CGFloat containerWidth = self.bounds.size.width;
-		CGFloat offsetX = 0;
-
-		// 查找目标容器视图
-		for (UIView *subview in self.subviews) {
-			if ([subview class] == [UIView class] && fabs(subview.frame.size.width - self.bounds.size.width) > 0.1) {
-				targetView = subview;
-				containerWidth = subview.frame.size.width;
-				offsetX = subview.frame.origin.x;
-				break;
-			}
-		}
-
-		// 在目标容器内均匀分布按钮
-		CGFloat buttonWidth = containerWidth / visibleButtons.count;
-		for (NSInteger i = 0; i < visibleButtons.count; i++) {
-			UIView *button = visibleButtons[i];
-			button.frame = CGRectMake(offsetX + (i * buttonWidth), button.frame.origin.y, buttonWidth, button.frame.size.height);
-		}
-	} else {
-		// iPhone端布局逻辑
-		CGFloat totalWidth = self.bounds.size.width;
-		CGFloat buttonWidth = totalWidth / visibleButtons.count;
-
-		for (NSInteger i = 0; i < visibleButtons.count; i++) {
-			UIView *button = visibleButtons[i];
-			button.frame = CGRectMake(i * buttonWidth, button.frame.origin.y, buttonWidth, button.frame.size.height);
-		}
-	}
-}
-
-%end
-
 // 隐藏双指缩放虾线
 %hook AWELoadingAndVolumeView
 
@@ -3744,11 +3714,8 @@ static AWEIMReusableCommonCell *currentCell;
 - (void)layoutSubviews {
 	%orig;
 	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideRecommendTips"]) {
-		UIView *parentView = self.superview;
-		if (parentView) {
-			parentView.hidden = YES;
-		} else {
-			self.hidden = YES;
+		if (self.accessibilityLabel) {
+			[self removeFromSuperview];
 		}
 	}
 }
@@ -4219,250 +4186,250 @@ static AWEIMReusableCommonCell *currentCell;
 %hook AWEAwemeModel
 
 - (id)initWithDictionary:(id)arg1 error:(id *)arg2 {
-    id orig = %orig;
+	id orig = %orig;
 
-    BOOL noAds = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYNoAds"];
-    BOOL skipLive = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipLive"];
-    BOOL skipHotSpot = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipHotSpot"];
-    BOOL filterHDR = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYfilterFeedHDR"];
+	BOOL noAds = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYNoAds"];
+	BOOL skipLive = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipLive"];
+	BOOL skipHotSpot = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipHotSpot"];
+	BOOL filterHDR = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYfilterFeedHDR"];
 
-    BOOL shouldFilterAds = noAds && (self.hotSpotLynxCardModel || self.isAds);
-    BOOL shouldFilterRec = skipLive && (self.liveReason != nil);
-    BOOL shouldFilterHotSpot = skipHotSpot && self.hotSpotLynxCardModel;
-    BOOL shouldFilterHDR = NO;
-    BOOL shouldFilterLowLikes = NO;
-    BOOL shouldFilterKeywords = NO;
-    BOOL shouldFilterTime = NO;
-    BOOL shouldFilterUser = NO;
-    BOOL shouldFilterProp = NO;
+	BOOL shouldFilterAds = noAds && (self.hotSpotLynxCardModel || self.isAds);
+	BOOL shouldFilterRec = skipLive && (self.liveReason != nil);
+	BOOL shouldFilterHotSpot = skipHotSpot && self.hotSpotLynxCardModel;
+	BOOL shouldFilterHDR = NO;
+	BOOL shouldFilterLowLikes = NO;
+	BOOL shouldFilterKeywords = NO;
+	BOOL shouldFilterTime = NO;
+	BOOL shouldFilterUser = NO;
+	BOOL shouldFilterProp = NO;
 
-    // 获取用户设置的需要过滤的关键词
-    NSString *filterKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterKeywords"];
-    NSArray *keywordsList = nil;
+	// 获取用户设置的需要过滤的关键词
+	NSString *filterKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterKeywords"];
+	NSArray *keywordsList = nil;
 
-    if (filterKeywords.length > 0) {
-        keywordsList = [filterKeywords componentsSeparatedByString:@","];
-    }
+	if (filterKeywords.length > 0) {
+		keywordsList = [filterKeywords componentsSeparatedByString:@","];
+	}
 
-    // 获取需要过滤的道具关键词
-    NSString *filterProp = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterProp"];
-    NSArray *propKeywordsList = nil;
-    
-    if (filterProp.length > 0) {
-        propKeywordsList = [filterProp componentsSeparatedByString:@","];
-    }
+	// 获取需要过滤的道具关键词
+	NSString *filterProp = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterProp"];
+	NSArray *propKeywordsList = nil;
 
-    // 获取需要过滤的用户列表
-    NSString *filterUsers = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterUsers"];
+	if (filterProp.length > 0) {
+		propKeywordsList = [filterProp componentsSeparatedByString:@","];
+	}
 
-    // 检查是否需要过滤特定用户
-    if (self.shareRecExtra && filterUsers.length > 0 && self.author) {
-        NSArray *usersList = [filterUsers componentsSeparatedByString:@","];
-        NSString *currentShortID = self.author.shortID;
-        NSString *currentNickname = self.author.nickname;
+	// 获取需要过滤的用户列表
+	NSString *filterUsers = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterUsers"];
 
-        if (currentShortID.length > 0) {
-            for (NSString *userInfo in usersList) {
-                // 解析"昵称-id"格式
-                NSArray *components = [userInfo componentsSeparatedByString:@"-"];
-                if (components.count >= 2) {
-                    NSString *userId = [components lastObject];
-                    NSString *userNickname = [[components subarrayWithRange:NSMakeRange(0, components.count - 1)] componentsJoinedByString:@"-"];
+	// 检查是否需要过滤特定用户
+	if (self.shareRecExtra && filterUsers.length > 0 && self.author) {
+		NSArray *usersList = [filterUsers componentsSeparatedByString:@","];
+		NSString *currentShortID = self.author.shortID;
+		NSString *currentNickname = self.author.nickname;
 
-                    if ([userId isEqualToString:currentShortID]) {
-                        shouldFilterUser = YES;
-                        break;
-                    }
-                }
-            }
-        }
-    }
+		if (currentShortID.length > 0) {
+			for (NSString *userInfo in usersList) {
+				// 解析"昵称-id"格式
+				NSArray *components = [userInfo componentsSeparatedByString:@"-"];
+				if (components.count >= 2) {
+					NSString *userId = [components lastObject];
+					NSString *userNickname = [[components subarrayWithRange:NSMakeRange(0, components.count - 1)] componentsJoinedByString:@"-"];
 
-    NSInteger filterLowLikesThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfilterLowLikes"];
+					if ([userId isEqualToString:currentShortID]) {
+						shouldFilterUser = YES;
+						break;
+					}
+				}
+			}
+		}
+	}
 
-    // 只有当shareRecExtra不为空时才过滤点赞量低的视频和关键词
-    if (self.shareRecExtra && ![self.shareRecExtra isEqual:@""]) {
-        // 过滤低点赞量视频
-        if (filterLowLikesThreshold > 0) {
-            AWESearchAwemeExtraModel *searchExtraModel = [self searchExtraModel];
-            if (!searchExtraModel) {
-                AWEAwemeStatisticsModel *statistics = self.statistics;
-                if (statistics && statistics.diggCount) {
-                    shouldFilterLowLikes = statistics.diggCount.integerValue < filterLowLikesThreshold;
-                }
-            }
-        }
+	NSInteger filterLowLikesThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfilterLowLikes"];
 
-        // 过滤包含特定关键词的视频
-        if (keywordsList.count > 0) {
-            // 检查视频标题
-            if (self.descriptionString.length > 0) {
-                for (NSString *keyword in keywordsList) {
-                    NSString *trimmedKeyword = [keyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-                    if (trimmedKeyword.length > 0 && [self.descriptionString containsString:trimmedKeyword]) {
-                        shouldFilterKeywords = YES;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        // 过滤包含指定拍同款的视频
-        if (propKeywordsList.count > 0 && self.propGuideV2) {
-            NSString *propName = self.propGuideV2.propName;
-            if (propName.length > 0) {
-                for (NSString *propKeyword in propKeywordsList) {
-                    NSString *trimmedKeyword = [propKeyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-                    if (trimmedKeyword.length > 0 && [propName containsString:trimmedKeyword]) {
-                        shouldFilterProp = YES;
-                        break;
-                    }
-                }
-            }
-        }
+	// 只有当shareRecExtra不为空时才过滤点赞量低的视频和关键词
+	if (self.shareRecExtra && ![self.shareRecExtra isEqual:@""]) {
+		// 过滤低点赞量视频
+		if (filterLowLikesThreshold > 0) {
+			AWESearchAwemeExtraModel *searchExtraModel = [self searchExtraModel];
+			if (!searchExtraModel) {
+				AWEAwemeStatisticsModel *statistics = self.statistics;
+				if (statistics && statistics.diggCount) {
+					shouldFilterLowLikes = statistics.diggCount.integerValue < filterLowLikesThreshold;
+				}
+			}
+		}
 
-        // 过滤视频发布时间
-        long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
-        NSInteger daysThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfiltertimelimit"];
-        if (daysThreshold > 0) {
-            NSTimeInterval videoTimestamp = [self.createTime doubleValue];
-            if (videoTimestamp > 0) {
-                NSTimeInterval threshold = daysThreshold * 86400.0;
-                NSTimeInterval current = (NSTimeInterval)currentTimestamp;
-                NSTimeInterval timeDifference = current - videoTimestamp;
-                shouldFilterTime = (timeDifference > threshold);
-            }
-        }
-    }
-    // 检查是否为HDR视频
-    if (filterHDR && self.video && self.video.bitrateModels) {
-        for (id bitrateModel in self.video.bitrateModels) {
-            NSNumber *hdrType = [bitrateModel valueForKey:@"hdrType"];
-            NSNumber *hdrBit = [bitrateModel valueForKey:@"hdrBit"];
+		// 过滤包含特定关键词的视频
+		if (keywordsList.count > 0) {
+			// 检查视频标题
+			if (self.descriptionString.length > 0) {
+				for (NSString *keyword in keywordsList) {
+					NSString *trimmedKeyword = [keyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+					if (trimmedKeyword.length > 0 && [self.descriptionString containsString:trimmedKeyword]) {
+						shouldFilterKeywords = YES;
+						break;
+					}
+				}
+			}
+		}
 
-            // 如果hdrType=1且hdrBit=10，则视为HDR视频
-            if (hdrType && [hdrType integerValue] == 1 && hdrBit && [hdrBit integerValue] == 10) {
-                shouldFilterHDR = YES;
-                break;
-            }
-        }
-    }
-    if (shouldFilterAds || shouldFilterRec || shouldFilterHotSpot || shouldFilterHDR || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterTime || shouldFilterUser || shouldFilterProp) {
-        return nil;
-    }
+		// 过滤包含指定拍同款的视频
+		if (propKeywordsList.count > 0 && self.propGuideV2) {
+			NSString *propName = self.propGuideV2.propName;
+			if (propName.length > 0) {
+				for (NSString *propKeyword in propKeywordsList) {
+					NSString *trimmedKeyword = [propKeyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+					if (trimmedKeyword.length > 0 && [propName containsString:trimmedKeyword]) {
+						shouldFilterProp = YES;
+						break;
+					}
+				}
+			}
+		}
 
-    return orig;
+		// 过滤视频发布时间
+		long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
+		NSInteger daysThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfiltertimelimit"];
+		if (daysThreshold > 0) {
+			NSTimeInterval videoTimestamp = [self.createTime doubleValue];
+			if (videoTimestamp > 0) {
+				NSTimeInterval threshold = daysThreshold * 86400.0;
+				NSTimeInterval current = (NSTimeInterval)currentTimestamp;
+				NSTimeInterval timeDifference = current - videoTimestamp;
+				shouldFilterTime = (timeDifference > threshold);
+			}
+		}
+	}
+	// 检查是否为HDR视频
+	if (filterHDR && self.video && self.video.bitrateModels) {
+		for (id bitrateModel in self.video.bitrateModels) {
+			NSNumber *hdrType = [bitrateModel valueForKey:@"hdrType"];
+			NSNumber *hdrBit = [bitrateModel valueForKey:@"hdrBit"];
+
+			// 如果hdrType=1且hdrBit=10，则视为HDR视频
+			if (hdrType && [hdrType integerValue] == 1 && hdrBit && [hdrBit integerValue] == 10) {
+				shouldFilterHDR = YES;
+				break;
+			}
+		}
+	}
+	if (shouldFilterAds || shouldFilterRec || shouldFilterHotSpot || shouldFilterHDR || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterTime || shouldFilterUser || shouldFilterProp) {
+		return nil;
+	}
+
+	return orig;
 }
 
 - (id)init {
-    id orig = %orig;
+	id orig = %orig;
 
-    BOOL noAds = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYNoAds"];
-    BOOL skipLive = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipLive"];
-    BOOL skipHotSpot = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipHotSpot"];
-    BOOL filterHDR = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYfilterFeedHDR"];
+	BOOL noAds = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYNoAds"];
+	BOOL skipLive = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipLive"];
+	BOOL skipHotSpot = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipHotSpot"];
+	BOOL filterHDR = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYfilterFeedHDR"];
 
-    BOOL shouldFilterAds = noAds && (self.hotSpotLynxCardModel || self.isAds);
-    BOOL shouldFilterRec = skipLive && (self.liveReason != nil);
-    BOOL shouldFilterHotSpot = skipHotSpot && self.hotSpotLynxCardModel;
-    BOOL shouldFilterHDR = NO;
-    BOOL shouldFilterLowLikes = NO;
-    BOOL shouldFilterKeywords = NO;
-    BOOL shouldFilterProp = NO;
-    BOOL shouldFilterTime = NO;
+	BOOL shouldFilterAds = noAds && (self.hotSpotLynxCardModel || self.isAds);
+	BOOL shouldFilterRec = skipLive && (self.liveReason != nil);
+	BOOL shouldFilterHotSpot = skipHotSpot && self.hotSpotLynxCardModel;
+	BOOL shouldFilterHDR = NO;
+	BOOL shouldFilterLowLikes = NO;
+	BOOL shouldFilterKeywords = NO;
+	BOOL shouldFilterProp = NO;
+	BOOL shouldFilterTime = NO;
 
-    // 获取用户设置的需要过滤的关键词
-    NSString *filterKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterKeywords"];
-    NSArray *keywordsList = nil;
+	// 获取用户设置的需要过滤的关键词
+	NSString *filterKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterKeywords"];
+	NSArray *keywordsList = nil;
 
-    if (filterKeywords.length > 0) {
-        keywordsList = [filterKeywords componentsSeparatedByString:@","];
-    }
-    
-    // 过滤包含指定拍同款的视频
-    NSString *filterProp = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterProp"];
-    NSArray *propKeywordsList = nil;
-    
-    if (filterProp.length > 0) {
-        propKeywordsList = [filterProp componentsSeparatedByString:@","];
-    }
+	if (filterKeywords.length > 0) {
+		keywordsList = [filterKeywords componentsSeparatedByString:@","];
+	}
 
-    NSInteger filterLowLikesThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfilterLowLikes"];
+	// 过滤包含指定拍同款的视频
+	NSString *filterProp = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterProp"];
+	NSArray *propKeywordsList = nil;
 
-    // 只有当shareRecExtra不为空时才过滤
-    if (self.shareRecExtra && ![self.shareRecExtra isEqual:@""]) {
-        // 过滤低点赞量视频
-        if (filterLowLikesThreshold > 0) {
-            AWESearchAwemeExtraModel *searchExtraModel = [self searchExtraModel];
-            if (!searchExtraModel) {
-                AWEAwemeStatisticsModel *statistics = self.statistics;
-                if (statistics && statistics.diggCount) {
-                    shouldFilterLowLikes = statistics.diggCount.integerValue < filterLowLikesThreshold;
-                }
-            }
-        }
+	if (filterProp.length > 0) {
+		propKeywordsList = [filterProp componentsSeparatedByString:@","];
+	}
 
-        // 过滤包含特定关键词的视频
-        if (keywordsList.count > 0) {
-            // 检查视频标题
-            if (self.descriptionString.length > 0) {
-                for (NSString *keyword in keywordsList) {
-                    NSString *trimmedKeyword = [keyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-                    if (trimmedKeyword.length > 0 && [self.descriptionString containsString:trimmedKeyword]) {
-                        shouldFilterKeywords = YES;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        // 过滤包含特定道具的视频
-        if (propKeywordsList.count > 0 && self.propGuideV2) {
-            NSString *propName = self.propGuideV2.propName;
-            if (propName.length > 0) {
-                for (NSString *propKeyword in propKeywordsList) {
-                    NSString *trimmedKeyword = [propKeyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-                    if (trimmedKeyword.length > 0 && [propName containsString:trimmedKeyword]) {
-                        shouldFilterProp = YES;
-                        break;
-                    }
-                }
-            }
-        }
+	NSInteger filterLowLikesThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfilterLowLikes"];
 
-        // 过滤视频发布时间
-        long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
-        NSInteger daysThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfiltertimelimit"];
-        if (daysThreshold > 0) {
-            NSTimeInterval videoTimestamp = [self.createTime doubleValue];
-            if (videoTimestamp > 0) {
-                NSTimeInterval threshold = daysThreshold * 86400.0;
-                NSTimeInterval current = (NSTimeInterval)currentTimestamp;
-                NSTimeInterval timeDifference = current - videoTimestamp;
-                shouldFilterTime = (timeDifference > threshold);
-            }
-        }
-    }
+	// 只有当shareRecExtra不为空时才过滤
+	if (self.shareRecExtra && ![self.shareRecExtra isEqual:@""]) {
+		// 过滤低点赞量视频
+		if (filterLowLikesThreshold > 0) {
+			AWESearchAwemeExtraModel *searchExtraModel = [self searchExtraModel];
+			if (!searchExtraModel) {
+				AWEAwemeStatisticsModel *statistics = self.statistics;
+				if (statistics && statistics.diggCount) {
+					shouldFilterLowLikes = statistics.diggCount.integerValue < filterLowLikesThreshold;
+				}
+			}
+		}
 
-    // 检查是否为HDR视频
-    if (filterHDR && self.video && self.video.bitrateModels) {
-        for (id bitrateModel in self.video.bitrateModels) {
-            NSNumber *hdrType = [bitrateModel valueForKey:@"hdrType"];
-            NSNumber *hdrBit = [bitrateModel valueForKey:@"hdrBit"];
+		// 过滤包含特定关键词的视频
+		if (keywordsList.count > 0) {
+			// 检查视频标题
+			if (self.descriptionString.length > 0) {
+				for (NSString *keyword in keywordsList) {
+					NSString *trimmedKeyword = [keyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+					if (trimmedKeyword.length > 0 && [self.descriptionString containsString:trimmedKeyword]) {
+						shouldFilterKeywords = YES;
+						break;
+					}
+				}
+			}
+		}
 
-            // 如果hdrType=1且hdrBit=10，则视为HDR视频
-            if (hdrType && [hdrType integerValue] == 1 && hdrBit && [hdrBit integerValue] == 10) {
-                shouldFilterHDR = YES;
-                break;
-            }
-        }
-    }
+		// 过滤包含特定道具的视频
+		if (propKeywordsList.count > 0 && self.propGuideV2) {
+			NSString *propName = self.propGuideV2.propName;
+			if (propName.length > 0) {
+				for (NSString *propKeyword in propKeywordsList) {
+					NSString *trimmedKeyword = [propKeyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+					if (trimmedKeyword.length > 0 && [propName containsString:trimmedKeyword]) {
+						shouldFilterProp = YES;
+						break;
+					}
+				}
+			}
+		}
 
-    if (shouldFilterAds || shouldFilterRec || shouldFilterHotSpot || shouldFilterHDR || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterProp || shouldFilterTime) {
-        return nil;
-    }
+		// 过滤视频发布时间
+		long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
+		NSInteger daysThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfiltertimelimit"];
+		if (daysThreshold > 0) {
+			NSTimeInterval videoTimestamp = [self.createTime doubleValue];
+			if (videoTimestamp > 0) {
+				NSTimeInterval threshold = daysThreshold * 86400.0;
+				NSTimeInterval current = (NSTimeInterval)currentTimestamp;
+				NSTimeInterval timeDifference = current - videoTimestamp;
+				shouldFilterTime = (timeDifference > threshold);
+			}
+		}
+	}
 
-    return orig;
+	// 检查是否为HDR视频
+	if (filterHDR && self.video && self.video.bitrateModels) {
+		for (id bitrateModel in self.video.bitrateModels) {
+			NSNumber *hdrType = [bitrateModel valueForKey:@"hdrType"];
+			NSNumber *hdrBit = [bitrateModel valueForKey:@"hdrBit"];
+
+			// 如果hdrType=1且hdrBit=10，则视为HDR视频
+			if (hdrType && [hdrType integerValue] == 1 && hdrBit && [hdrBit integerValue] == 10) {
+				shouldFilterHDR = YES;
+				break;
+			}
+		}
+	}
+
+	if (shouldFilterAds || shouldFilterRec || shouldFilterHotSpot || shouldFilterHDR || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterProp || shouldFilterTime) {
+		return nil;
+	}
+
+	return orig;
 }
 
 - (bool)preventDownload {
@@ -4480,6 +4447,40 @@ static AWEIMReusableCommonCell *currentCell;
 	}
 
 	%orig;
+}
+
+// 固定设置为 1，启用自定义背景色
+- (NSUInteger)awe_playerBackgroundViewShowType {
+	if ([[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYVideoBGColor"]) {
+		return 1;
+	}
+	return %orig;
+}
+
+- (UIColor *)awe_smartBackgroundColor {
+	NSString *colorHex = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYVideoBGColor"];
+	if (colorHex && colorHex.length > 0) {
+		UIColor *customColor = [DYYYUtils colorWithHexString:colorHex];
+		if (customColor) {
+			return customColor;
+		}
+	}
+	return %orig;
+}
+
+%end
+
+%hook MTKView
+
+- (void)layoutSubviews {
+	%orig;
+	NSString *colorHex = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYVideoBGColor"];
+	if (colorHex && colorHex.length > 0) {
+		UIColor *customColor = [DYYYUtils colorWithHexString:colorHex];
+		if (customColor) {
+			self.backgroundColor = customColor;
+		}
+	}
 }
 
 %end
@@ -4621,11 +4622,11 @@ static AWEIMReusableCommonCell *currentCell;
 									      completion:^(BOOL success) {
 										if (success) {
 										} else {
-											[DYYYManager showToast:@"图片保存已取消"];
+											[DYYYUtils showToast:@"图片保存已取消"];
 										}
 									      }];
 						      } else {
-							      [DYYYManager showToast:@"没有找到合适格式的图片"];
+							      [DYYYUtils showToast:@"没有找到合适格式的图片"];
 						      }
 					      }
 				      } else if (isNewLivePhoto) {
@@ -4742,7 +4743,7 @@ static AWEIMReusableCommonCell *currentCell;
 					      }
 
 					      if (livePhotos.count == 0 && imageURLs.count == 0) {
-						      [DYYYManager showToast:@"没有找到合适格式的图片"];
+						      [DYYYUtils showToast:@"没有找到合适格式的图片"];
 					      }
 					    }];
 				[actions addObject:downloadAllAction];
@@ -4773,7 +4774,7 @@ static AWEIMReusableCommonCell *currentCell;
 															  handler:^{
 															    NSString *shareLink = [awemeModel valueForKey:@"shareURL"];
 															    if (shareLink.length == 0) {
-																    [DYYYManager showToast:@"无法获取分享链接"];
+																    [DYYYUtils showToast:@"无法获取分享链接"];
 																    return;
 															    }
 
@@ -4842,7 +4843,7 @@ static AWEIMReusableCommonCell *currentCell;
 						  completion:^(BOOL success, NSString *message) {
 						    if (success) {
 						    } else {
-							    [DYYYManager showToast:[NSString stringWithFormat:@"视频制作失败: %@", message]];
+							    [DYYYUtils showToast:[NSString stringWithFormat:@"视频制作失败: %@", message]];
 						    }
 						  }];
 					    }];
@@ -4924,7 +4925,7 @@ static AWEIMReusableCommonCell *currentCell;
 
 %new
 - (void)updateDarkModeAppearance {
-	BOOL isDarkMode = [DYYYManager isDarkMode];
+	BOOL isDarkMode = [DYYYUtils isDarkMode];
 
 	UIView *contentView = self.view.subviews.count > 1 ? self.view.subviews[1] : nil;
 	if (contentView) {
@@ -4997,13 +4998,13 @@ static AWEIMReusableCommonCell *currentCell;
 	%orig;
 
 	if (newWindow) {
-		BOOL isDarkMode = [DYYYManager isDarkMode];
+		BOOL isDarkMode = [DYYYUtils isDarkMode];
 		self.keyboardAppearance = isDarkMode ? UIKeyboardAppearanceDark : UIKeyboardAppearanceLight;
 	}
 }
 
 - (BOOL)becomeFirstResponder {
-	BOOL isDarkMode = [DYYYManager isDarkMode];
+	BOOL isDarkMode = [DYYYUtils isDarkMode];
 	self.keyboardAppearance = isDarkMode ? UIKeyboardAppearanceDark : UIKeyboardAppearanceLight;
 	return %orig;
 }
@@ -5016,13 +5017,13 @@ static AWEIMReusableCommonCell *currentCell;
 	%orig;
 
 	if (newWindow) {
-		BOOL isDarkMode = [DYYYManager isDarkMode];
+		BOOL isDarkMode = [DYYYUtils isDarkMode];
 		self.keyboardAppearance = isDarkMode ? UIKeyboardAppearanceDark : UIKeyboardAppearanceLight;
 	}
 }
 
 - (BOOL)becomeFirstResponder {
-	BOOL isDarkMode = [DYYYManager isDarkMode];
+	BOOL isDarkMode = [DYYYUtils isDarkMode];
 	self.keyboardAppearance = isDarkMode ? UIKeyboardAppearanceDark : UIKeyboardAppearanceLight;
 	return %orig;
 }
@@ -5046,7 +5047,7 @@ static void DYYYAddCustomViewToParent(UIView *parentView, float transparency) {
 		}
 	}
 
-	BOOL isDarkMode = [DYYYManager isDarkMode];
+	BOOL isDarkMode = [DYYYUtils isDarkMode];
 	UIBlurEffectStyle blurStyle = isDarkMode ? UIBlurEffectStyleDark : UIBlurEffectStyleLight;
 
 	if (transparency <= 0 || transparency > 1) {
@@ -5661,17 +5662,100 @@ static CGFloat currentScale = 1.0;
 
 %hook AWENormalModeTabBar
 
+- (void)layoutSubviews {
+	%orig;
+
+	BOOL hideShop = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideShopButton"];
+	BOOL hideMsg = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideMessageButton"];
+	BOOL hideFri = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideFriendsButton"];
+	BOOL hideMe = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideMyButton"];
+
+	NSMutableArray *visibleButtons = [NSMutableArray array];
+	Class generalButtonClass = %c(AWENormalModeTabBarGeneralButton);
+	Class plusButtonClass = %c(AWENormalModeTabBarGeneralPlusButton);
+	Class tabBarButtonClass = %c(UITabBarButton);
+
+	for (UIView *subview in self.subviews) {
+		if (![subview isKindOfClass:generalButtonClass] && ![subview isKindOfClass:plusButtonClass])
+			continue;
+
+		NSString *label = subview.accessibilityLabel;
+		BOOL shouldHide = NO;
+
+		if ([label isEqualToString:@"商城"]) {
+			shouldHide = hideShop;
+		} else if ([label containsString:@"消息"]) {
+			shouldHide = hideMsg;
+		} else if ([label containsString:@"朋友"]) {
+			shouldHide = hideFri;
+		} else if ([label containsString:@"我"]) {
+			shouldHide = hideMe;
+		}
+
+		if (!shouldHide) {
+			[visibleButtons addObject:subview];
+		} else {
+			subview.userInteractionEnabled = NO;
+			[subview removeFromSuperview];
+		}
+	}
+
+	for (UIView *subview in self.subviews) {
+		if (![subview isKindOfClass:tabBarButtonClass])
+			continue;
+		subview.userInteractionEnabled = NO;
+		[subview removeFromSuperview];
+	}
+
+	[visibleButtons sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
+	  return [@(a.frame.origin.x) compare:@(b.frame.origin.x)];
+	}];
+
+	if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+		// iPad端布局逻辑
+		UIView *targetView = nil;
+		CGFloat containerWidth = self.bounds.size.width;
+		CGFloat offsetX = 0;
+
+		// 查找目标容器视图
+		for (UIView *subview in self.subviews) {
+			if ([subview class] == [UIView class] && fabs(subview.frame.size.width - self.bounds.size.width) > 0.1) {
+				targetView = subview;
+				containerWidth = subview.frame.size.width;
+				offsetX = subview.frame.origin.x;
+				break;
+			}
+		}
+
+		// 在目标容器内均匀分布按钮
+		CGFloat buttonWidth = containerWidth / visibleButtons.count;
+		for (NSInteger i = 0; i < visibleButtons.count; i++) {
+			UIView *button = visibleButtons[i];
+			button.frame = CGRectMake(offsetX + (i * buttonWidth), button.frame.origin.y, buttonWidth, button.frame.size.height);
+		}
+	} else {
+		// iPhone端布局逻辑
+		CGFloat totalWidth = self.bounds.size.width;
+		CGFloat buttonWidth = totalWidth / visibleButtons.count;
+
+		for (NSInteger i = 0; i < visibleButtons.count; i++) {
+			UIView *button = visibleButtons[i];
+			button.frame = CGRectMake(i * buttonWidth, button.frame.origin.y, buttonWidth, button.frame.size.height);
+		}
+	}
+}
+
 - (void)setHidden:(BOOL)hidden {
 	%orig(hidden);
 
 	Class generalButtonClass = %c(AWENormalModeTabBarGeneralButton);
+	BOOL disableHomeRefresh = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDisableHomeRefresh"];
+
 	for (UIView *subview in self.subviews) {
 		if ([subview isKindOfClass:generalButtonClass]) {
 			AWENormalModeTabBarGeneralButton *button = (AWENormalModeTabBarGeneralButton *)subview;
-			if ([button.accessibilityLabel isEqualToString:@"首页"] && [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDisableHomeRefresh"] && button.status == 2) {
-				button.userInteractionEnabled = NO;
-			} else if ([button.accessibilityLabel isEqualToString:@"首页"] && [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDisableHomeRefresh"] && button.status == 1) {
-				button.userInteractionEnabled = YES;
+			if ([button.accessibilityLabel isEqualToString:@"首页"] && disableHomeRefresh) {
+				button.userInteractionEnabled = (button.status != 2);
 			}
 		}
 	}
