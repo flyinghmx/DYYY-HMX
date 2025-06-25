@@ -76,6 +76,21 @@ NS_ASSUME_NONNULL_BEGIN
  */
 + (void)removeAllContentsAtPath:(NSString *)directoryPath;
 
+/**
+ * 返回插件缓存目录路径，默认为 tmp/DYYY
+ */
++ (NSString *)cacheDirectory;
+
+/**
+ * 清理插件缓存目录
+ */
++ (void)clearCacheDirectory;
+
+/**
+ * 在缓存目录下生成指定文件名的完整路径
+ */
++ (NSString *)cachePathForFilename:(NSString *)filename;
+
 @end
 
 #ifdef __cplusplus
@@ -94,6 +109,23 @@ NSString * _Nullable cleanShareURL(NSString * _Nullable url);
  * @return 顶层视图控制器
  */
 UIViewController * _Nullable topView(void);
+
+/**
+ * 判断视图是否包含指定类型的子视图
+ */
+BOOL viewContainsSubviewOfClass(UIView * _Nullable view, Class _Nullable viewClass);
+
+/** 判断是否为右侧互动区域 */
+BOOL isRightInteractionStack(UIView * _Nullable stackView);
+
+/** 判断是否为左侧互动区域 */
+BOOL isLeftInteractionStack(UIView * _Nullable stackView);
+
+/** 在视图控制器层级中查找指定类的控制器 */
+UIViewController * _Nullable findViewControllerOfClass(UIViewController * _Nullable rootVC, Class _Nullable targetClass);
+
+/** 根据设置应用顶栏透明度 */
+void applyTopBarTransparency(UIView * _Nullable topBar);
 
 #ifdef __cplusplus
 }

@@ -186,7 +186,6 @@ static CGFloat gStartVal = 0.0;
 @end
 
 @interface AWEFeedContainerContentView : UIView
-- (UIViewController *)findViewController:(UIViewController *)vc ofClass:(Class)targetClass;
 @end
 
 @interface AWELeftSideBarEntranceView : UIView
@@ -279,7 +278,6 @@ static CGFloat gStartVal = 0.0;
 @end
 
 @interface AWEPlayInteractionProgressController : AWEPlayInteractionNewBaseController
-- (UIViewController *)findViewController:(UIViewController *)vc ofClass:(Class)targetClass;
 @property(retain, nonatomic) id progressSlider;
 - (NSString *)formatTimeFromSeconds:(CGFloat)seconds;
 - (NSString *)convertSecondsToTimeString:(NSInteger)totalSeconds;
@@ -681,11 +679,9 @@ static CGFloat gStartVal = 0.0;
 @end
 
 @interface AWEFeedTopBarContainer : UIView
-- (void)applyDYYYTransparency;
 @end
 
 @interface AWEHPTopBarCTAContainer : UIView
-- (void)applyDYYYTransparency;
 @end
 
 @interface ACCStickerContainerView : UIView
@@ -787,7 +783,6 @@ static CGFloat gStartVal = 0.0;
 - (void)applyCustomProgressStyle;
 @end
 
-// 添加 DUXContentSheet 相关声明
 @protocol IESIMContentSheetVCProtocol
 , AWEMRGlobalAlertTrackProtocol;
 @interface DUXBasicSheet : UIViewController
@@ -799,6 +794,7 @@ static CGFloat gStartVal = 0.0;
 @interface AWESettingItemModel : NSObject
 @property(nonatomic, copy) NSString *identifier;
 @property(nonatomic, copy) NSString *title;
+@property(nonatomic, copy) NSString *subTitle;
 @property(nonatomic, copy) NSString *detail;
 @property(nonatomic, assign) NSInteger type;
 @property(nonatomic, copy) NSString *iconImageName;
@@ -809,6 +805,7 @@ static CGFloat gStartVal = 0.0;
 @property(nonatomic, assign) BOOL isSwitchOn;
 @property(nonatomic, copy) void (^cellTappedBlock)(void);
 @property(nonatomic, copy) void (^switchChangedBlock)(void);
+- (void)refreshCell;
 @end
 
 @interface AWESettingBaseViewModel : NSObject
@@ -828,15 +825,6 @@ static CGFloat gStartVal = 0.0;
 
 - (AWESettingItemModel *)createSettingItem:(NSDictionary *)dict;
 - (AWESettingItemModel *)createSettingItem:(NSDictionary *)dict cellTapHandlers:(NSMutableDictionary *)cellTapHandlers;
-
-- (void)refreshTableView;
-- (void)updateSectionDataArray;
-- (void)handleConflictsAndDependenciesForSetting:(NSString *)identifier isEnabled:(BOOL)isEnabled;
-- (void)updateDependentItemsForSetting:(NSString *)identifier value:(id)value;
-- (void)handleConflictsAndDependenciesForSetting:(NSString *)identifier isEnabled:(BOOL)isEnabled;
-- (void)applyDependencyRulesForItem:(AWESettingItemModel *)item;
-- (void)updateConflictingItemUIState:(NSString *)identifier withValue:(BOOL)value;
-- (NSDictionary *)settingsDependencyConfig;
 @end
 
 @interface AWENavigationBar : UIView
@@ -847,18 +835,14 @@ static CGFloat gStartVal = 0.0;
 @property(nonatomic, assign) NSInteger type;
 @property(nonatomic, assign) CGFloat sectionHeaderHeight;
 @property(nonatomic, copy) NSString *sectionHeaderTitle;
+@property(nonatomic, copy) NSString *sectionFooterTitle;
+@property (nonatomic, assign) BOOL useNewFooterLayout;
 @property(nonatomic, strong) NSArray *itemArray;
 @property(retain, nonatomic) NSString *identifier;
 @property(copy, nonatomic) NSString *title;
 - (id)initWithIdentifier:(id)arg1;
 - (void)setIsSelect:(BOOL)arg1;
 - (BOOL)isSelect;
-- (void)setCellTappedBlock:(id)arg1;
-- (AWESettingItemModel *)createSettingItem:(NSDictionary *)dict;
-- (AWESettingItemModel *)createSettingItem:(NSDictionary *)dict cellTapHandlers:(NSMutableDictionary *)cellTapHandlers;
-- (void)applyDependencyRulesForItem:(AWESettingItemModel *)item;
-- (void)handleConflictsAndDependenciesForSetting:(NSString *)identifier isEnabled:(BOOL)isEnabled;
-- (void)updateDependentItemsForSetting:(NSString *)identifier value:(id)value;
 @end
 
 @interface AWEPrivacySettingActionSheetConfig : NSObject
@@ -1068,16 +1052,6 @@ static CGFloat gStartVal = 0.0;
 @end
 
 @interface AWELiveAutoEnterStyleAView : UIView
-@end
-
-@interface AWEABTestManager : NSObject
-@property(retain, nonatomic) NSDictionary *abTestData;
-@property(retain, nonatomic) NSMutableDictionary *consistentABTestDic;
-@property(copy, nonatomic) NSDictionary *performanceReversalDic;
-- (void)setAbTestData:(id)arg1;
-- (void)_saveABTestData:(id)arg1;
-- (id)abTestData;
-+ (id)sharedManager;
 @end
 
 @interface IESLiveRoomComponent : NSObject
