@@ -208,7 +208,7 @@ static CGFloat gStartVal = 0.0;
 
 @interface AWEPlayInteractionViewController : UIViewController
 @property(nonatomic, strong) UIView *view;
-@property (nonatomic, strong) AWEAwemeModel *model;
+@property(nonatomic, strong) AWEAwemeModel *model;
 @property(nonatomic, strong) NSString *referString;
 @property(nonatomic, assign) BOOL isCommentVCShowing;
 - (void)performCommentAction;
@@ -322,7 +322,6 @@ static CGFloat gStartVal = 0.0;
 @end
 
 @interface AWEPlayInteractionProgressContainerView : UIView
-- (void)dyyy_applyShrinkIfNeeded;
 @end
 
 @interface AFDFastSpeedView : UIView
@@ -460,8 +459,6 @@ static CGFloat gStartVal = 0.0;
 @property(nonatomic, strong) UIView *leftLabelUI;
 @property(nonatomic, strong) UIView *rightLabelUI;
 @property(nonatomic) AWEPlayInteractionProgressController *progressSliderDelegate;
-
-- (void)applyCustomProgressStyle;
 - (void)applyWidthPercentToSubviews:(CGFloat)widthPercent;
 @end
 
@@ -781,7 +778,6 @@ static CGFloat gStartVal = 0.0;
 @end
 
 @interface AWEFakeProgressSliderView : UIView
-- (void)applyCustomProgressStyle;
 @end
 
 @protocol IESIMContentSheetVCProtocol
@@ -837,7 +833,7 @@ static CGFloat gStartVal = 0.0;
 @property(nonatomic, assign) CGFloat sectionHeaderHeight;
 @property(nonatomic, copy) NSString *sectionHeaderTitle;
 @property(nonatomic, copy) NSString *sectionFooterTitle;
-@property (nonatomic, assign) BOOL useNewFooterLayout;
+@property(nonatomic, assign) BOOL useNewFooterLayout;
 @property(nonatomic, strong) NSArray *itemArray;
 @property(retain, nonatomic) NSString *identifier;
 @property(copy, nonatomic) NSString *title;
@@ -998,6 +994,18 @@ static CGFloat gStartVal = 0.0;
 
 // 直播间点赞动画
 @interface HTSLiveDiggView : UIView
+@end
+@interface IESLiveStickerView : UIView
+@end
+@interface IESLiveDynamicUserEnterView : UIView
+@end
+@interface IESLiveDynamicRankListEntranceView : UIView
+@end
+@interface IESLiveShortTouchActionView : UIView
+@end
+@interface PlatformCanvasView : UIView
+@end
+@interface IESLiveLotteryAnimationViewNew : UIView
 @end
 
 // 隐藏状态栏
