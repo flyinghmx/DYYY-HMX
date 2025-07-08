@@ -641,6 +641,14 @@
 	return orig;
 }
 
+- (void)setAlpha:(CGFloat)alpha {
+	if (DYYYGetBool(@"DYYYCommentShowDanmaku")) {
+		return;
+	} else {
+		%orig(alpha);
+	}
+}
+
 %end
 
 %hook AWEMarkView
@@ -757,19 +765,17 @@
 %new
 - (void)applyBlurEffectIfNeeded {
 	if (DYYYGetBool(@"DYYYisEnableCommentBlur") && [self isKindOfClass:NSClassFromString(@"AWECommentPanelContainerSwiftImpl.CommentContainerInnerViewController")]) {
-
-		self.view.backgroundColor = [UIColor clearColor];
-		// 递归清除所有子视图的背景色，防止遮挡模糊效果
-		[DYYYUtils clearBackgroundRecursivelyInView:self.view];
-
 		// 动态获取用户设置的透明度
 		float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
 		if (userTransparency <= 0 || userTransparency > 1) {
-			userTransparency = 0.5; // 默认值0.5（半透明）
+			userTransparency = 0.9;
 		}
 
 		// 应用毛玻璃效果
 		[DYYYUtils applyBlurEffectToView:self.view transparency:userTransparency blurViewTag:999];
+
+		// 递归清除所有子视图的背景色，防止遮挡模糊效果
+		[DYYYUtils clearBackgroundRecursivelyInView:self.view];
 	}
 }
 %end
@@ -1687,31 +1693,11 @@ static NSString *const kDYYYLongPressCopyEnabledKey = @"DYYYLongPressCopyTextEna
 
 %new
 - (void)setupBlurEffectForNotificationView {
-	UIView *container = nil;
 	for (UIView *subview in self.subviews) {
 		if ([NSStringFromClass([subview class]) containsString:@"AWEInnerNotificationContainerView"]) {
-			container = subview;
+			[self applyBlurEffectToView:subview];
 			break;
 		}
-	}
-
-	if (!container) {
-		return;
-	}
-
-	UIVisualEffectView *existingBlur = (UIVisualEffectView *)[container viewWithTag:999];
-	if (!existingBlur) {
-		[self applyBlurEffectToView:container];
-	} else {
-		BOOL isDarkMode = [DYYYUtils isDarkMode];
-		UIBlurEffectStyle blurStyle = isDarkMode ? UIBlurEffectStyleDark : UIBlurEffectStyleLight;
-		existingBlur.effect = [UIBlurEffect effectWithStyle:blurStyle];
-
-		float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
-		if (userTransparency <= 0 || userTransparency > 1) {
-			userTransparency = 0.5;
-		}
-		existingBlur.alpha = userTransparency;
 	}
 }
 
@@ -1769,30 +1755,23 @@ static NSString *const kDYYYLongPressCopyEnabledKey = @"DYYYLongPressCopyTextEna
 			UILabel *label = (UILabel *)subview;
 			NSString *text = label.text;
 
-			float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
-			if (userTransparency <= 0 || userTransparency > 1) {
-				userTransparency = 0.5;
+			if (![text isEqualToString:@"回复"] && ![text isEqualToString:@"查看"] && ![text isEqualToString:@"续火花"]) {
+				label.textColor = [UIColor whiteColor];
 			}
-
-			[DYYYUtils applyBlurEffectToView:subview transparency:userTransparency blurViewTag:999];
-			[DYYYUtils clearBackgroundRecursivelyInView:subview];
-
-			// 定义排除 Block
-			NSSet *excludedTexts = [NSSet setWithObjects:@"回复", @"查看", @"续火花", nil];
-			BOOL (^excludeBlock)(UIView *) = ^BOOL(UIView *currentView) {
-			  if ([currentView isKindOfClass:[UILabel class]]) {
-				  UILabel *label = (UILabel *)currentView;
-				  if (label.text && [excludedTexts containsObject:label.text]) {
-					  return YES;
-				  }
-			  }
-			  return NO;
-			};
-			// 调用新的通用方法设置文本颜色，并传入排除 Block
-			[DYYYUtils applyTextColorRecursively:[UIColor whiteColor] inView:subview shouldExcludeViewBlock:excludeBlock];
-
-			break;
 		}
+		[self setLabelsColorWhiteInView:subview];
+	}
+}
+
+%new
+- (void)clearBackgroundRecursivelyInView:(UIView *)view {
+	for (UIView *subview in view.subviews) {
+		if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == 999 && [subview isKindOfClass:[UIButton class]]) {
+			continue;
+		}
+		subview.backgroundColor = [UIColor clearColor];
+		subview.opaque = NO;
+		[self clearBackgroundRecursivelyInView:subview];
 	}
 }
 
@@ -1948,11 +1927,8 @@ static NSString *const kDYYYLongPressCopyEnabledKey = @"DYYYLongPressCopyTextEna
 	if (forceBlur && forceDark) {
 		return 1;
 	} else if (!forceBlur && !forceDark) {
-		return 2;
-	} else if (!forceBlur && forceDark) {
-		return 3;
-	} else { // forceBlur && !forceDark
-		return 4;
+		BOOL isDarkMode = [DYYYUtils isDarkMode];
+		return isDarkMode ? 1 : 2;
 	}
 }
 %end
@@ -1969,11 +1945,8 @@ static NSString *const kDYYYLongPressCopyEnabledKey = @"DYYYLongPressCopyTextEna
 	if (forceBlur && forceDark) {
 		return 1;
 	} else if (!forceBlur && !forceDark) {
-		return 2;
-	} else if (!forceBlur && forceDark) {
-		return 3;
-	} else { // forceBlur && !forceDark
-		return 4;
+		BOOL isDarkMode = [DYYYUtils isDarkMode];
+		return isDarkMode ? 1 : 2;
 	}
 }
 %end
@@ -2532,9 +2505,9 @@ static AWEIMReusableCommonCell *currentCell;
 	if (DYYYGetBool(@"DYYYHideHisShop")) {
 		UIView *parentView = self.superview;
 		if (parentView) {
-			parentView.hidden = YES;
+			[parentView removeFromSuperview];
 		} else {
-			self.hidden = YES;
+			[self removeFromSuperview];
 		}
 	}
 }
@@ -2794,14 +2767,6 @@ static AWEIMReusableCommonCell *currentCell;
 				}
 			}
 		}
-	}
-}
-- (void)setBackgroundColor:(UIColor *)backgroundColor {
-	// 禁用背景色设置
-	if (DYYYGetBool(@"DYYYHideGradient")) {
-		%orig(UIColor.clearColor);
-	} else {
-		%orig(backgroundColor);
 	}
 }
 %end
@@ -3287,7 +3252,7 @@ static AWEIMReusableCommonCell *currentCell;
 }
 %end
 
-// 隐藏昵称上方
+// 隐藏昵称上方元素
 %hook AWEFeedTemplateAnchorView
 
 - (void)layoutSubviews {
@@ -3309,7 +3274,10 @@ static AWEIMReusableCommonCell *currentCell;
 	if ((hideFeedAnchor && !isPoi) || (hideLocation && isPoi)) {
 		UIView *parentView = self.superview;
 		if (parentView) {
-			parentView.hidden = YES;
+			UIView *grandparentView = parentView.superview;
+			if (grandparentView && [grandparentView isKindOfClass:%c(AWEBaseElementView)]) {
+				[grandparentView removeFromSuperview];
+			}
 		}
 	}
 }
@@ -3530,6 +3498,24 @@ static AWEIMReusableCommonCell *currentCell;
 	}
 
 	%orig(hidden);
+}
+%end
+
+%hook AWEHomePageBubbleLiveHeadLabelContentView
+- (void)layoutSubviews {
+	%orig;
+	if (DYYYGetBool(@"DYYYHideConcernCapsuleView")) {
+		UIView *parentView = self.superview;
+		UIView *grandparentView = parentView.superview;
+
+		if (grandparentView) {
+			[grandparentView removeFromSuperview];
+		} else if (parentView) {
+			[parentView removeFromSuperview];
+		} else {
+			[self removeFromSuperview];
+		}
+	}
 }
 %end
 
@@ -4207,10 +4193,10 @@ static AWEIMReusableCommonCell *currentCell;
 }
 %end
 
-%hook PlatformCanvasView
+%hook IESLiveHotMessageView
 - (void)layoutSubviews {
 	%orig;
-	if (DYYYGetBool(@"DYYYHideLivePopup")) {
+	if (DYYYGetBool(@"DYYYHideLiveHotMessage")) {
 		[self removeFromSuperview];
 	}
 }
@@ -4260,8 +4246,8 @@ static AWEIMReusableCommonCell *currentCell;
 	BOOL filterHDR = DYYYGetBool(@"DYYYfilterFeedHDR");
 
 	BOOL shouldFilterAds = noAds && (self.hotSpotLynxCardModel || self.isAds);
-	BOOL shouldFilterRec = skipLive && (self.liveReason != nil);
 	BOOL shouldFilterHotSpot = skipHotSpot && self.hotSpotLynxCardModel;
+	BOOL shouldFilterRecLive = skipLive && (self.cellRoom != nil);
 	BOOL shouldFilterHDR = NO;
 	BOOL shouldFilterLowLikes = NO;
 	BOOL shouldFilterKeywords = NO;
@@ -4289,7 +4275,7 @@ static AWEIMReusableCommonCell *currentCell;
 	NSString *filterUsers = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterUsers"];
 
 	// 检查是否需要过滤特定用户
-	if (self.shareRecExtra && filterUsers.length > 0 && self.author) {
+	if (self.shareRecExtra && ![self.shareRecExtra isEqual:@""] && filterUsers.length > 0 && self.author) {
 		NSArray *usersList = [filterUsers componentsSeparatedByString:@","];
 		NSString *currentShortID = self.author.shortID;
 		NSString *currentNickname = self.author.nickname;
@@ -4311,10 +4297,9 @@ static AWEIMReusableCommonCell *currentCell;
 		}
 	}
 
-	NSInteger filterLowLikesThreshold = DYYYGetInteger(@"DYYYfilterLowLikes");
-
 	// 只有当shareRecExtra不为空时才过滤点赞量低的视频和关键词
 	if (self.shareRecExtra && ![self.shareRecExtra isEqual:@""]) {
+		NSInteger filterLowLikesThreshold = DYYYGetInteger(@"DYYYfilterLowLikes");
 		// 过滤低点赞量视频
 		if (filterLowLikesThreshold > 0) {
 			AWESearchAwemeExtraModel *searchExtraModel = [self searchExtraModel];
@@ -4381,7 +4366,7 @@ static AWEIMReusableCommonCell *currentCell;
 			}
 		}
 	}
-	return shouldFilterAds || shouldFilterRec || shouldFilterHotSpot || shouldFilterHDR || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterProp || shouldFilterTime || shouldFilterUser;
+	return shouldFilterAds || shouldFilterRecLive || shouldFilterHotSpot || shouldFilterHDR || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterProp || shouldFilterTime || shouldFilterUser;
 }
 
 - (AWEECommerceLabel *)ecommerceBelowLabel {
@@ -4433,12 +4418,16 @@ static AWEIMReusableCommonCell *currentCell;
 
 - (void)layoutSubviews {
 	%orig;
-	NSString *colorHex = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYVideoBGColor"];
-	if (colorHex && colorHex.length > 0) {
-		CGFloat screenWidth = [UIScreen mainScreen].bounds.size.width;
-		UIColor *customColor = [DYYYUtils colorFromSchemeHexString:colorHex targetWidth:screenWidth];
-		if (customColor)
-			self.backgroundColor = customColor;
+	UIViewController *vc = [DYYYUtils firstAvailableViewControllerFromView:self];
+	Class playVCClass = NSClassFromString(@"AWEPlayVideoViewController");
+	if (vc && playVCClass && [vc isKindOfClass:playVCClass]) {
+		NSString *colorHex = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYVideoBGColor"];
+		if (colorHex && colorHex.length > 0) {
+			CGFloat screenWidth = [UIScreen mainScreen].bounds.size.width;
+			UIColor *customColor = [DYYYUtils colorFromSchemeHexString:colorHex targetWidth:screenWidth];
+			if (customColor)
+				self.backgroundColor = customColor;
+		}
 	}
 }
 
@@ -5027,6 +5016,33 @@ static CGFloat customTabBarHeight() {
 		}
 	}
 
+	if (DYYYGetBool(@"DYYYisEnableFullScreen") || DYYYGetBool(@"DYYYisEnableCommentBlur")) {
+		UIViewController *vc = [DYYYUtils firstAvailableViewControllerFromView:self];
+		if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)]) {
+			for (UIView *subview in self.subviews) {
+				if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor && CGColorEqualToColor(subview.backgroundColor.CGColor, [UIColor blackColor].CGColor)) {
+					subview.hidden = YES;
+				}
+			}
+		}
+	}
+
+	if (DYYYGetBool(@"DYYYisEnableCommentBlur")) {
+		NSString *className = NSStringFromClass([self class]);
+		if ([className isEqualToString:@"AWECommentInputViewSwiftImpl.CommentInputContainerView"]) {
+			for (UIView *subview in self.subviews) {
+				if ([subview isKindOfClass:[UIView class]] && ![subview.backgroundColor isEqual:[UIColor clearColor]]) {
+					float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
+					if (userTransparency <= 0 || userTransparency > 1) {
+						userTransparency = 0.8;
+					}
+					[DYYYUtils applyBlurEffectToView:subview transparency:userTransparency blurViewTag:999];
+					[DYYYUtils clearBackgroundRecursivelyInView:subview];
+				}
+			}
+		}
+	}
+
 	if (DYYYGetBool(@"DYYYisEnableCommentBlur")) {
 		for (UIView *subview in self.subviews) {
 			if ([subview isKindOfClass:NSClassFromString(@"AWECommentInputViewSwiftImpl.CommentInputViewMiddleContainer")]) {
@@ -5055,28 +5071,9 @@ static CGFloat customTabBarHeight() {
 				}
 			}
 		}
-
-		NSString *className = NSStringFromClass([self class]);
-		if ([className isEqualToString:@"AWECommentInputViewSwiftImpl.CommentInputContainerView"]) {
-			for (UIView *subview in self.subviews) {
-				if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor) {
-					CGFloat red = 0, green = 0, blue = 0, alpha = 0;
-					[subview.backgroundColor getRed:&red green:&green blue:&blue alpha:&alpha];
-
-					if ((red == 22 / 255.0 && green == 22 / 255.0 && blue == 22 / 255.0) || (red == 1.0 && green == 1.0 && blue == 1.0)) {
-						float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
-						if (userTransparency <= 0 || userTransparency > 1) {
-							userTransparency = 0.95;
-						}
-						[DYYYUtils applyBlurEffectToView:subview transparency:userTransparency blurViewTag:999];
-						[DYYYUtils clearBackgroundRecursivelyInView:subview];
-					}
-				}
-			}
-		}
 	}
 
-	if (DYYYGetBool(@"DYYYisEnableCommentBarBlur")) {
+	if (DYYYGetBool(@"DYYYisEnableCommentBlur")) {
 		for (UIView *subview in self.subviews) {
 			if ([subview isKindOfClass:NSClassFromString(@"AWECommentInputViewSwiftImpl.CommentInputViewMiddleContainer")]) {
 				BOOL containsDanmu = NO;
@@ -5088,30 +5085,11 @@ static CGFloat customTabBarHeight() {
 				}
 				if (!containsDanmu) {
 					for (UIView *innerSubview in subview.subviews) {
-						if ([innerSubview isKindOfClass:[UIView class]]) {
-							float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
-							if (userTransparency <= 0 || userTransparency > 1) {
-								userTransparency = 0.95;
-							}
-							[DYYYUtils applyBlurEffectToView:innerSubview transparency:userTransparency blurViewTag:999];
+						if ([innerSubview isKindOfClass:[UIView class]] && ![innerSubview.backgroundColor isEqual:[UIColor clearColor]]) {
+							[DYYYUtils applyBlurEffectToView:innerSubview transparency:0.2f blurViewTag:999];
 							[DYYYUtils clearBackgroundRecursivelyInView:innerSubview];
 							break;
 						}
-					}
-				}
-			}
-		}
-	}
-
-	if (DYYYGetBool(@"DYYYisEnableFullScreen") || DYYYGetBool(@"DYYYisEnableCommentBlur")) {
-		UIViewController *vc = [DYYYUtils firstAvailableViewControllerFromView:self];
-		if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)]) {
-			BOOL shouldHideSubview = DYYYGetBool(@"DYYYisEnableFullScreen") || DYYYGetBool(@"DYYYisEnableCommentBlur");
-
-			if (shouldHideSubview) {
-				for (UIView *subview in self.subviews) {
-					if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor && CGColorEqualToColor(subview.backgroundColor.CGColor, [UIColor blackColor].CGColor)) {
-						subview.hidden = YES;
 					}
 				}
 			}
@@ -5544,8 +5522,8 @@ static CGFloat currentScale = 1.0;
 
 %hook AWELandscapeFeedEntryView
 - (void)setCenter:(CGPoint)center {
-	if (DYYYGetBool(@"DYYYisEnableFullScreen") || DYYYGetBool(@"DYYYisEnableCommentBlur")) {
-		center.y += 60;
+	if (DYYYGetBool(@"DYYYisEnableFullScreen")) {
+		center.y += 50;
 	}
 
 	%orig(center);
