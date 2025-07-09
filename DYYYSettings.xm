@@ -1033,13 +1033,15 @@ extern "C"
 	  NSArray *infoSettings = @[
 		  @{@"identifier" : @"DYYYHidenLiveView",
 		    @"title" : @"隐藏关注顶端",
+			@"subTitle" : @"隐藏关注页顶端的直播列表",
 		    @"detail" : @"",
-		    @"cellType" : @6,
+		    @"cellType" : @37,
 		    @"imageName" : @"ic_eyeslash_outlined_16"},
 		  @{@"identifier" : @"DYYYHideMenuView",
 		    @"title" : @"隐藏同城顶端",
+			@"subTitle" : @"隐藏同城页顶端的团购等菜单",
 		    @"detail" : @"",
-		    @"cellType" : @6,
+		    @"cellType" : @37,
 		    @"imageName" : @"ic_eyeslash_outlined_16"},
 		  @{@"identifier" : @"DYYYHideNearbyCapsuleView",
 		    @"title" : @"隐藏吃喝玩乐",
@@ -1370,6 +1372,14 @@ extern "C"
 			  @"identifier" : @"DYYYHideLivePopup",
 			  @"title" : @"隐藏进场特效",
 			  @"subTitle" : @"隐藏会员用户进入直播间时出现在弹幕顶部的动画特效",
+			  @"detail" : @"",
+			  @"cellType" : @37,
+			  @"imageName" : @"ic_eyeslash_outlined_16"
+		  },
+		  @{
+			  @"identifier" : @"DYYYHideLiveDanmaku",
+			  @"title" : @"隐藏滚动弹幕",
+			  @"subTitle" : @"隐藏直播间管理员发送的特殊横向滚动弹幕",
 			  @"detail" : @"",
 			  @"cellType" : @37,
 			  @"imageName" : @"ic_eyeslash_outlined_16"
