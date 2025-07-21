@@ -332,11 +332,14 @@ static CGFloat gStartVal = 0.0;
 @end
 
 @interface AWEAdAvatarView : UIView
+@end
 
+@interface AWETabBarSkinContainerView : UIView
 @end
 
 @interface AWENormalModeTabBar : UIView
 @property(nonatomic, assign, readonly) UITabBarController *yy_viewController;
+@property(retain, nonatomic) AWETabBarSkinContainerView *skinContainerView;
 @end
 
 @interface AWEPlayInteractionListenFeedView : UIView
@@ -557,11 +560,6 @@ static CGFloat gStartVal = 0.0;
 @property(nonatomic, assign, getter=isHidden) BOOL hidden;
 @end
 
-@interface AWEFeedStickerContainerView : UIView
-@property(nonatomic, strong, readonly) UIView *superview;
-@property(nonatomic, assign, getter=isHidden) BOOL hidden;
-@end
-
 @interface AWEECommerceEntryView : UIView
 @property(nonatomic, strong, readonly) UIView *superview;
 @property(nonatomic, assign, getter=isHidden) BOOL hidden;
@@ -675,8 +673,7 @@ static CGFloat gStartVal = 0.0;
 - (void)p_initUI;
 @end
 
-@interface AWELiveSkylightCatchView : UIView
-- (void)setupUI;
+@interface AWELiveFeedLabelTagView : UIView
 @end
 
 @interface AWEIMFansGroupTopDynamicDomainTemplateView : UIView
@@ -1049,11 +1046,14 @@ static CGFloat gStartVal = 0.0;
 // 直播间商品信息
 @interface IESECLivePluginLayoutView : UIView
 @end
-
+@interface IESECLiveGoodsCardView : UIView
+@end
 // 直播间点赞动画
 @interface HTSLiveDiggView : UIView
 @end
 @interface IESLiveStickerView : UIView
+@end
+@interface IESLiveGroupLiveComponentView : UIView
 @end
 @interface IESLivePreAnnouncementPanelViewNew : UIView
 @end
@@ -1066,6 +1066,8 @@ static CGFloat gStartVal = 0.0;
 @interface PlatformCanvasView : UIView
 @end
 @interface IESLiveDanmakuVariousView : UIView
+@end
+@interface IESLiveDanmakuSupremeView : UIView
 @end
 @interface IESLiveLotteryAnimationViewNew : UIView
 @end
@@ -1227,7 +1229,6 @@ static CGFloat gStartVal = 0.0;
 
 @interface AWESettingsTableViewController : AWESettingBaseViewController
 - (id)viewModel;
-- (void)removeAboutSection;
 @end
 
 @interface AWEProfileMixCollectionView : UICollectionView
@@ -1297,6 +1298,17 @@ static CGFloat gStartVal = 0.0;
 @interface MTKView : UIView
 @end
 
+@interface AWEConcernCellLastView : UIView
+@end
+
 @interface HTSEventForwardingView : UIView
 @property(copy, nonatomic) NSString *levelName;
+@end
+
+@interface AWEAwemePlayVideoViewController (SpeedControl)
+- (void)adjustPlaybackSpeed:(float)speed;
+@end
+
+@interface AWEDPlayerFeedPlayerViewController (SpeedControl)
+- (void)adjustPlaybackSpeed:(float)speed;
 @end
