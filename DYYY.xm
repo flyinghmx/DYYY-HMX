@@ -1585,6 +1585,30 @@ static NSString *const kDYYYLongPressCopyEnabledKey = @"DYYYLongPressCopyTextEna
 
 %end
 
+%hook AWENormalModeTabBarGeneralPlusButton
+- (void)setImage:(UIImage *)image forState:(UIControlState)state {
+
+    if ([self.accessibilityLabel isEqualToString:@"拍摄"]) {
+
+        NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+        NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+
+        NSString *customImagePath = [dyyyFolderPath stringByAppendingPathComponent:@"tab_plus.png"];
+
+        if ([[NSFileManager defaultManager] fileExistsAtPath:customImagePath]) {
+            UIImage *customImage = [UIImage imageWithContentsOfFile:customImagePath];
+            if (customImage) {
+
+                %orig(customImage, state);
+                return;
+            }
+        }
+    }
+
+    %orig;
+}
+%end
+
 // 获取资源的地址
 %hook AWEURLModel
 %new - (NSURL *)getDYYYSrcURLDownload {
@@ -3041,11 +3065,20 @@ static AWEIMReusableCommonCell *currentCell;
     %orig;
 
     if (DYYYGetBool(@"DYYYHideSearchBubble")) {
-        self.hidden = YES;
+        [self removeFromSuperview];
         return;
     }
 }
 
+%end
+
+%hook AWEFeedLiveTabTopSelectionView
+- (void)setHideTimer:(id)timer {
+    if (DYYYGetBool(@"DYYYDisableAutoHideLive")) {
+        timer = nil;
+    }
+    %orig(timer);
+}
 %end
 
 %hook AWEMusicCoverButton
@@ -3108,7 +3141,12 @@ static AWEIMReusableCommonCell *currentCell;
 - (void)layoutSubviews {
     if (DYYYGetBool(@"DYYYHideGradient")) {
         UIView *parent = self.superview;
-        if ([parent.accessibilityLabel isEqualToString:@"暂停，按钮"] || [parent.accessibilityLabel isEqualToString:@"播放，按钮"] || [parent.accessibilityLabel isEqualToString:@"“切换视角，按钮"]) {
+        if (
+            [parent.accessibilityLabel isEqualToString:@"暂停，按钮"] || 
+            [parent.accessibilityLabel isEqualToString:@"播放，按钮"] || 
+            [parent.accessibilityLabel isEqualToString:@"“切换视角，按钮"] ||
+            [parent isKindOfClass:%c(AWEStoryProgressContainerView)]
+        ) {
             self.hidden = YES;
         }
         return;
@@ -3215,6 +3253,21 @@ static AWEIMReusableCommonCell *currentCell;
     } else {
         if (class_getInstanceMethod([self class], @selector(prefersStatusBarHidden)) !=
             class_getInstanceMethod([%c(AWEFullPageFeedNewContainerViewController) class], @selector(prefersStatusBarHidden))) {
+            return %orig;
+        }
+        return NO;
+    }
+}
+%end
+
+// 纯净模式状态栏
+%hook AFDPureModePageContainerViewController
+- (BOOL)prefersStatusBarHidden {
+    if (DYYYGetBool(@"DYYYHideStatusbar")) {
+        return YES;
+    } else {
+        if (class_getInstanceMethod([self class], @selector(prefersStatusBarHidden)) !=
+            class_getInstanceMethod([%c(AFDPureModePageContainerViewController) class], @selector(prefersStatusBarHidden))) {
             return %orig;
         }
         return NO;
@@ -3536,20 +3589,6 @@ static AWEIMReusableCommonCell *currentCell;
 }
 %end
 
-// 隐藏图片滑条
-%hook AWEStoryProgressContainerView
-- (BOOL)isHidden {
-    BOOL originalValue = %orig;
-    BOOL customHide = DYYYGetBool(@"DYYYHideDotsIndicator");
-    return originalValue || customHide;
-}
-
-- (void)setHidden:(BOOL)hidden {
-    BOOL forceHide = DYYYGetBool(@"DYYYHideDotsIndicator");
-    %orig(forceHide ? YES : hidden);
-}
-%end
-
 // 隐藏昵称右侧
 %hook UILabel
 - (void)layoutSubviews {
@@ -3628,6 +3667,19 @@ static AWEIMReusableCommonCell *currentCell;
         }
     }
 }
+%end
+
+%hook AWEProfilePostEmptyPublishGuideCollectionViewCell
+
+- (void)didMoveToSuperview {
+    %orig;
+    if (DYYYGetBool(@"DYYYHidePostView")) {
+    if ([(UIView *)self superview]) {
+        [(UIView *)self setHidden:YES];
+    }
+}
+}
+
 %end
 
 %hook AWEProfileTaskCardStyleListCollectionViewCell
@@ -3843,6 +3895,16 @@ static AWEIMReusableCommonCell *currentCell;
 
 %end
 
+%hook AWEPlayInteractionLiveExtendGuideView
+- (void)layoutSubviews {
+    if (DYYYGetBool(@"DYYYHideLiveCapsuleView")) {
+        [self removeFromSuperview];
+        return;
+    }
+    %orig;
+}
+%end
+
 // 隐藏首页直播胶囊
 %hook AWEHPTopTabItemBadgeContentView
 
@@ -4008,6 +4070,7 @@ static AWEIMReusableCommonCell *currentCell;
     BOOL hideClear = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideLiveRoomClear"];
     BOOL hideMirror = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideLiveRoomMirroring"];
     BOOL hideFull = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideLiveRoomFullscreen"];
+    BOOL hideClose = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideLiveRoomClose"];
 
     if (!(hideClear || hideMirror || hideFull)) {
         return;
@@ -4030,6 +4093,9 @@ static AWEIMReusableCommonCell *currentCell;
         for (UIView *subview in cached) {
             subview.hidden = YES;
         }
+        return;
+    } else if (hideClose && [self.superview isKindOfClass:%c(HTSLive4LayerContainerView)]) {
+        self.hidden = YES;
         return;
     }
 }
@@ -4266,12 +4332,14 @@ static AWEIMReusableCommonCell *currentCell;
 - (BOOL)contentFilter {
     BOOL noAds = DYYYGetBool(@"DYYYNoAds");
     BOOL skipLive = DYYYGetBool(@"DYYYSkipLive");
+    BOOL skipAllLive = DYYYGetBool(@"DYYYSkipAllLive");
     BOOL skipHotSpot = DYYYGetBool(@"DYYYSkipHotSpot");
     BOOL filterHDR = DYYYGetBool(@"DYYYFilterFeedHDR");
 
     BOOL shouldFilterAds = noAds && (self.isAds);
     BOOL shouldFilterHotSpot = skipHotSpot && self.hotSpotLynxCardModel;
     BOOL shouldFilterRecLive = skipLive && (self.cellRoom != nil);
+    BOOL shouldFilterAllLive = skipAllLive && [self.videoFeedTag isEqualToString:@"直播中"];
     BOOL shouldFilterHDR = NO;
     BOOL shouldFilterLowLikes = NO;
     BOOL shouldFilterKeywords = NO;
@@ -4390,7 +4458,7 @@ static AWEIMReusableCommonCell *currentCell;
             }
         }
     }
-    return shouldFilterAds || shouldFilterRecLive || shouldFilterHotSpot || shouldFilterHDR || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterProp || shouldFilterTime || shouldFilterUser;
+    return shouldFilterAds || shouldFilterRecLive || shouldFilterAllLive || shouldFilterHotSpot || shouldFilterHDR || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterProp || shouldFilterTime || shouldFilterUser;
 }
 
 - (AWEECommerceLabel *)ecommerceBelowLabel {
@@ -4398,6 +4466,36 @@ static AWEIMReusableCommonCell *currentCell;
         return nil;
     }
     return %orig;
+}
+
+- (void)setDescriptionString:(NSString *)desc {
+    NSString *labelStyle = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYLabelStyle"];
+    BOOL hideLabel = [labelStyle isEqualToString:@"文案标签隐藏"];
+    if (hideLabel) {
+        // 过滤掉所有以 # 开头的标签
+        NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"#\\S+" options:0 error:nil];
+        NSString *filtered = [regex stringByReplacingMatchesInString:desc options:0 range:NSMakeRange(0, desc.length) withTemplate:@""];
+        // 去除首尾空白字符
+        filtered = [filtered stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        // 为空则赋nil，避免显示空行
+        desc = filtered.length > 0 ? filtered : nil;
+    }
+    %orig(desc);
+}
+
+- (void)setTextExtras:(NSArray *)extras {
+    NSString *labelStyle = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYLabelStyle"];
+    BOOL disableLabelSearch = [labelStyle isEqualToString:@"文案标签禁止跳转搜索"] || [labelStyle isEqualToString:@"文案标签隐藏"];
+    if (disableLabelSearch && [extras isKindOfClass:[NSArray class]]) {
+        NSMutableArray *filtered = [NSMutableArray array];
+        for (AWEAwemeTextExtraModel *model in extras) {
+            if (model.userID.length > 0) {
+                [filtered addObject:model];
+            }
+        }
+        extras = [filtered copy];
+    }
+    %orig(extras);
 }
 
 - (bool)preventDownload {
@@ -4430,6 +4528,25 @@ static AWEIMReusableCommonCell *currentCell;
     return %orig;
 }
 
+%end
+
+%hook AWEFeedCommentConfigModel
+- (void)setCommentInputConfigText:(NSString *)text {
+    NSString *customText = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentContent"];
+    if (customText && customText.length > 0) {
+        text = customText;
+    }
+    %orig(text);
+}
+%end
+
+%hook AWEAwemeStatusModel
+- (void)setListenVideoStatus:(NSInteger)status {
+    if (status == 1 && DYYYGetBool(@"DYYYEnableBackgroundListen")) {
+        status = 2;
+    }
+    %orig(status);
+}
 %end
 
 %hook MTKView
@@ -5043,6 +5160,7 @@ static CGFloat originalTabHeight = 0;
     Class generalButtonClass = %c(AWENormalModeTabBarGeneralButton);
     Class plusButtonClass = %c(AWENormalModeTabBarGeneralPlusButton);
     Class tabBarButtonClass = %c(UITabBarButton);
+    Class barBackgroundClass = NSClassFromString(@"_UIBarBackground");
 
     for (UIView *subview in self.subviews) {
         if ([subview isKindOfClass:generalButtonClass] || [subview isKindOfClass:plusButtonClass]) {
@@ -5066,6 +5184,8 @@ static CGFloat originalTabHeight = 0;
             [buttonsToRemove addObject:subview];
         } else if (isPad && ipadContainerView == nil && [subview class] == [UIView class] && fabs(subview.frame.size.width - self.bounds.size.width) > 0.1) {
             ipadContainerView = subview;
+        } else if (DYYYGetBool(@"DYYYHideBottomBg") && ![subview isKindOfClass:barBackgroundClass]) {
+            [buttonsToRemove addObject:subview];
         }
     }
 
@@ -5173,6 +5293,38 @@ static CGFloat originalTabHeight = 0;
             BOOL shouldShowBackground = isHomeSelected || (isFriendsSelected && !hideFriendsButton);
             backgroundView.hidden = shouldShowBackground;
         }
+    }
+
+    if (enableFullScreen) {
+        BOOL isHomeSelected = NO;
+        BOOL isFriendsSelected = NO;
+        BOOL hideFriendsButton = DYYYGetBool(@"DYYYHideFriendsButton");
+        Class generalButtonClass = %c(AWENormalModeTabBarGeneralButton);
+
+        for (UIView *subview in self.subviews) {
+            if ([subview isKindOfClass:generalButtonClass]) {
+                AWENormalModeTabBarGeneralButton *button = (AWENormalModeTabBarGeneralButton *)subview;
+                if (button.status == 2) {
+                    if ([button.accessibilityLabel isEqualToString:@"首页"]) {
+                        isHomeSelected = YES;
+                    } else if ([button.accessibilityLabel containsString:@"朋友"]) {
+                        isFriendsSelected = YES;
+                    }
+                }
+            }
+        }
+
+        BOOL shouldHideBackground = isHomeSelected || (isFriendsSelected && !hideFriendsButton);
+        
+        void (^__block traverseSubviews)(UIView *, BOOL) = ^(UIView *view, BOOL hide) {
+            for (UIView *subview in view.subviews) {
+                if (fabs(subview.frame.size.height - tabHeight) < 0.1) {
+                    subview.hidden = hide;
+                }
+            }
+        };
+
+        traverseSubviews(self, shouldHideBackground);
     }
 
     if (enableFullScreen) {
@@ -5535,29 +5687,6 @@ static CGFloat originalTabHeight = 0;
 
 %end
 
-// 开启评论区毛玻璃后滚动区域填满底部
-%hook AWEListKitMagicCollectionView
-
-- (void)layoutSubviews {
-    %orig;
-
-    if (!DYYYGetBool(@"DYYYEnableCommentBlur")) {
-        return;
-    }
-
-    UICollectionView *collectionView = (UICollectionView *)self;
-
-    UIView *superview = collectionView.superview;
-    CGRect targetFrame = superview.bounds;
-    if (superview == nil || CGSizeEqualToSize(targetFrame.size, CGSizeZero) || CGRectEqualToRect(collectionView.frame, targetFrame)) {
-        return;
-    }
-
-    collectionView.frame = targetFrame;
-}
-
-%end
-
 %hook UIView
 - (id)initWithFrame:(CGRect)frame {
     UIView *view = %orig;
@@ -5741,7 +5870,7 @@ static CGFloat originalTabHeight = 0;
 
     BOOL useFullHeight = [currentReferString isEqualToString:@"general_search"] || [currentReferString isEqualToString:@"chat"] || [currentReferString isEqualToString:@"search_result"] ||
                          [currentReferString isEqualToString:@"close_friends_moment"] || [currentReferString isEqualToString:@"offline_mode"] || [currentReferString isEqualToString:@"challenge"] ||
-                         currentReferString == nil;
+                         [currentReferString isEqualToString:@"general_search_scan"] || currentReferString == nil;
 
     if (useFullHeight) {
         frame.size.height = superviewHeight;
@@ -6191,9 +6320,9 @@ static Class TagViewClass = nil;
 %hook AWEElementStackView
 
 + (void)initialize {
-GuideViewClass = NSClassFromString(@"AWELivePrestreamGuideView");
-MuteViewClass = NSClassFromString(@"AFDCancelMuteAwemeView");
-TagViewClass = NSClassFromString(@"AWELiveFeedLabelTagView");
+    GuideViewClass = NSClassFromString(@"AWELivePrestreamGuideView");
+    MuteViewClass = NSClassFromString(@"AFDCancelMuteAwemeView");
+    TagViewClass = NSClassFromString(@"AWELiveFeedLabelTagView");
 }
 
 - (void)setAlpha:(CGFloat)alpha {
@@ -6234,7 +6363,7 @@ TagViewClass = NSClassFromString(@"AWELiveFeedLabelTagView");
         const CGFloat targetLabelScale = (labelScaleValue != 0.0) ? MAX(0.01, labelScaleValue) : 1.0;
         const CGFloat elementScaleValue = DYYYGetFloat(@"DYYYElementScale");
         const CGFloat targetElementScale = (elementScaleValue != 0.0) ? MAX(0.01, elementScaleValue) : 1.0;
-        
+
         CGAffineTransform targetTransform = CGAffineTransformIdentity;
         CGFloat boundsWidth = self.bounds.size.width;
         CGFloat currentScale = 1.0;
@@ -6351,9 +6480,9 @@ TagViewClass = NSClassFromString(@"AWELiveFeedLabelTagView");
 %hook IESLiveStackView
 
 + (void)initialize {
-GuideViewClass = NSClassFromString(@"AWELivePrestreamGuideView");
-MuteViewClass = NSClassFromString(@"AFDCancelMuteAwemeView");
-TagViewClass = NSClassFromString(@"AWELiveFeedLabelTagView");
+    GuideViewClass = NSClassFromString(@"AWELivePrestreamGuideView");
+    MuteViewClass = NSClassFromString(@"AFDCancelMuteAwemeView");
+    TagViewClass = NSClassFromString(@"AWELiveFeedLabelTagView");
 }
 
 - (void)setAlpha:(CGFloat)alpha {
@@ -6381,7 +6510,7 @@ TagViewClass = NSClassFromString(@"AWELiveFeedLabelTagView");
         const CGFloat targetLabelScale = (labelScaleValue != 0.0) ? MAX(0.01, labelScaleValue) : 1.0;
         const CGFloat elementScaleValue = DYYYGetFloat(@"DYYYElementScale");
         const CGFloat targetElementScale = (elementScaleValue != 0.0) ? MAX(0.01, elementScaleValue) : 1.0;
-        
+
         CGAffineTransform targetTransform = CGAffineTransformIdentity;
         CGFloat boundsWidth = self.bounds.size.width;
         CGFloat currentScale = 1.0;
@@ -6509,6 +6638,28 @@ TagViewClass = NSClassFromString(@"AWELiveFeedLabelTagView");
     for (UIView *view in bgViews) {
         view.backgroundColor = [UIColor clearColor];
     }
+}
+%end
+
+// 隐藏图片滑条
+%hook AWEStoryProgressContainerView
+- (void)setCenter:(CGPoint)center {
+    UIViewController *vc = [DYYYUtils firstAvailableViewControllerFromView:self];
+    if ([vc isKindOfClass:NSClassFromString(@"AWEFeedPlayControlImpl.PureModePageCellViewController")] && DYYYGetBool(@"DYYYEnableFullScreen")) {
+        center.y -= tabHeight;
+    }
+    %orig(center);
+}
+
+- (BOOL)isHidden {
+    BOOL originalValue = %orig;
+    BOOL customHide = DYYYGetBool(@"DYYYHideDotsIndicator");
+    return originalValue || customHide;
+}
+
+- (void)setHidden:(BOOL)hidden {
+    BOOL forceHide = DYYYGetBool(@"DYYYHideDotsIndicator");
+    %orig(forceHide ? YES : hidden);
 }
 %end
 
@@ -6717,7 +6868,7 @@ static NSString *const kStreamlineSidebarKey = @"DYYYHideSidebarElements";
     }
 
     // 只保留这两个 moduleID
-    NSSet *allowedModuleIDs = [NSSet setWithArray:@[@"top_area", @"more_function_module", @"notification_module_module"]];
+    NSSet *allowedModuleIDs = [NSSet setWithArray:@[ @"top_area", @"more_function_module", @"notification_module_module" ]];
 
     NSMutableArray *filteredModels = [NSMutableArray array];
 
@@ -6739,41 +6890,39 @@ static NSString *const kStreamlineSidebarKey = @"DYYYHideSidebarElements";
 
 - (NSArray *)bottomModuleModels {
     NSArray *originalBottomModels = %orig;
-    
+
     if (!DYYYGetBool(kStreamlineSidebarKey)) {
         return originalBottomModels;
     }
-    
+
     return @[];
 }
 
 %new
 - (id)filterModuleItems:(id)moduleModel {
-    if (![moduleModel respondsToSelector:@selector(items)] || 
-        ![moduleModel respondsToSelector:@selector(moduleID)]) {
+    if (![moduleModel respondsToSelector:@selector(items)] || ![moduleModel respondsToSelector:@selector(moduleID)]) {
         return moduleModel;
     }
-    
+
     NSString *moduleID = [moduleModel moduleID];
     NSArray *originalItems = [moduleModel items];
-    
+
     if ([moduleID isEqualToString:@"top_area"]) {
         // 只保留天气、设置、扫一扫
         NSMutableArray *filteredItems = [NSMutableArray array];
-        
+
         for (id item in originalItems) {
             if ([item respondsToSelector:@selector(businessType)]) {
                 NSString *businessType = [item businessType];
-                
+
                 // 保留需要的组件
-                if ([businessType isEqualToString:@"weather_time_tip_component"] ||
-                    [businessType isEqualToString:@"setting_page_component"] ||
+                if ([businessType isEqualToString:@"weather_time_tip_component"] || [businessType isEqualToString:@"setting_page_component"] ||
                     [businessType isEqualToString:@"top_area_vertical_cell"]) {
                     [filteredItems addObject:item];
                 }
             }
         }
-        
+
         // 创建新的模块对象，保持原有属性但更新items
         if ([moduleModel respondsToSelector:@selector(copy)]) {
             id newModule = [moduleModel copy];
@@ -6783,7 +6932,7 @@ static NSString *const kStreamlineSidebarKey = @"DYYYHideSidebarElements";
             return newModule;
         }
     }
-    
+
     return moduleModel;
 }
 
