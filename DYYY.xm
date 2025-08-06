@@ -794,35 +794,6 @@
 
 // 重写全局透明方法
 %hook AWEPlayInteractionViewController
-- (void)loadView {
-    %orig;
-    if (hideButton) {
-        hideButton.hidden = NO;
-        hideButton.alpha = 0.5;
-    }
-}
-
-- (void)viewWillAppear:(BOOL)animated {
-    %orig;
-    isInPlayInteractionVC = YES;
-    dyyyInteractionViewVisible = YES;
-    if (hideButton) {
-        hideButton.hidden = NO;
-        hideButton.alpha = 0.5;
-    }
-}
-
-- (void)viewDidAppear:(BOOL)animated {
-    %orig;
-    dyyyInteractionViewVisible = YES;
-}
-
-- (void)viewWillDisappear:(BOOL)animated {
-    %orig;
-    isInPlayInteractionVC = NO;
-    dyyyInteractionViewVisible = NO;
-}
-
 - (UIView *)view {
     NSString *transparentValue = DYYYGetString(@"DYYYGlobalTransparency");
     NSScanner *scanner = [NSScanner scannerWithString:transparentValue];
@@ -4135,6 +4106,16 @@ static AWEIMReusableCommonCell *currentCell;
 }
 %end
 
+%hook IESECLiveCardSizeComponent
+- (void)layoutSubviews {
+    if (DYYYGetBool(@"DYYYHideLiveGoodsMsg")) {
+        self.hidden = YES;
+        return;
+    }
+    %orig;
+}
+%end
+
 %hook IESECLiveGoodsCardView
 - (void)layoutSubviews {
     if (DYYYGetBool(@"DYYYHideLiveGoodsMsg")) {
@@ -5789,6 +5770,15 @@ static CGFloat originalTabHeight = 0;
 %end
 
 %hook AWEPlayInteractionViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    isInPlayInteractionVC = YES;
+    dyyyInteractionViewVisible = YES;
+    updateSpeedButtonVisibility();
+    updateClearButtonVisibility();
+}
+
 - (void)viewDidLayoutSubviews {
     %orig;
     if (isFloatSpeedButtonEnabled) {
@@ -6185,13 +6175,11 @@ static CGFloat originalTabHeight = 0;
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
     isPureViewVisible = YES;
-    updateClearButtonVisibility();
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
     %orig;
     isPureViewVisible = NO;
-    updateClearButtonVisibility();
 }
 %end
 
@@ -6325,11 +6313,24 @@ static Class TagViewClass = nil;
     TagViewClass = NSClassFromString(@"AWELiveFeedLabelTagView");
 }
 
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    dyyyCommentViewVisible = NO;
+    updateSpeedButtonVisibility();
+    updateClearButtonVisibility();
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    %orig;
+    dyyyCommentViewVisible = YES;
+    updateSpeedButtonVisibility();
+    updateClearButtonVisibility();
+}
+
 - (void)setAlpha:(CGFloat)alpha {
     %orig;
     if (speedButton && isFloatSpeedButtonEnabled) {
         if (alpha == 0) {
-            dyyyCommentViewVisible = YES;
         } else if (alpha == 1) {
             dyyyCommentViewVisible = NO;
         }
@@ -6674,8 +6675,14 @@ static Class TagViewClass = nil;
 
 - (void)layoutSubviews {
     %orig;
-    if (DYYYGetBool(@"DYYYHideEntry")) {
+    if (DYYYGetBool(@"DYYYRemoveEntry")) {
         [self removeFromSuperview];
+        return;
+    }
+    if (DYYYGetBool(@"DYYYHideEntry")) {
+        for(UIView *subview in self.subviews) {
+            subview.hidden = YES;
+        }
         return;
     }
 
