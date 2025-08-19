@@ -9,7 +9,6 @@
 #import <objc/runtime.h>
 
 #import "AwemeHeaders.h"
-#import "CityManager.h"
 #import "DYYYBottomAlertView.h"
 #import "DYYYManager.h"
 
@@ -216,8 +215,6 @@
             isHideChannel = [defaults boolForKey:@"DYYYHideHotContainer"];
         } else if ([channelID isEqualToString:@"homepage_follow"]) {
             isHideChannel = [defaults boolForKey:@"DYYYHideFollow"];
-        } else if ([channelID isEqualToString:@"homepage_mediumvideo"]) {
-            isHideChannel = [defaults boolForKey:@"DYYYHideMediumVideo"];
         } else if ([channelID isEqualToString:@"homepage_mall"]) {
             isHideChannel = [defaults boolForKey:@"DYYYHideMall"];
         } else if ([channelID isEqualToString:@"homepage_nearby"]) {
@@ -474,66 +471,6 @@
 
 %end
 
-%hook AWEFeedContainerContentView
-- (void)setAlpha:(CGFloat)alpha {
-    // 纯净模式功能
-    static dispatch_source_t timer = nil;
-    static int attempts = 0;
-    static BOOL pureModeSet = NO;
-    if (DYYYGetBool(@"DYYYEnablePure")) {
-        %orig(0.0);
-        if (pureModeSet) {
-            return;
-        }
-        if (!timer) {
-            timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
-            dispatch_source_set_timer(timer, DISPATCH_TIME_NOW, 0.5 * NSEC_PER_SEC, 0);
-            dispatch_source_set_event_handler(timer, ^{
-              UIWindow *keyWindow = [DYYYUtils getActiveWindow];
-              if (keyWindow && keyWindow.rootViewController) {
-                  UIViewController *feedVC = [DYYYUtils findViewControllerOfClass:NSClassFromString(@"AWEFeedTableViewController") inViewController:keyWindow.rootViewController];
-                  if (feedVC) {
-                      [feedVC setValue:@YES forKey:@"pureMode"];
-                      pureModeSet = YES;
-                      dispatch_source_cancel(timer);
-                      timer = nil;
-                      attempts = 0;
-                      return;
-                  }
-              }
-              attempts++;
-              if (attempts >= 10) {
-                  dispatch_source_cancel(timer);
-                  timer = nil;
-                  attempts = 0;
-              }
-            });
-            dispatch_resume(timer);
-        }
-        return;
-    } else {
-        if (timer) {
-            dispatch_source_cancel(timer);
-            timer = nil;
-        }
-        attempts = 0;
-        pureModeSet = NO;
-    }
-    NSString *transparentValue = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYTopBarTransparent"];
-    if (transparentValue && transparentValue.length > 0) {
-        CGFloat alphaValue = [transparentValue floatValue];
-        if (alphaValue >= 0.0 && alphaValue <= 1.0) {
-            CGFloat finalAlpha = (alphaValue < 0.011) ? 0.011 : alphaValue;
-            %orig(finalAlpha);
-        } else {
-            %orig(1.0);
-        }
-    } else {
-        %orig(1.0);
-    }
-}
-%end
-
 %hook AWEFeedTopBarContainer
 - (void)didMoveToSuperview {
     %orig;
@@ -661,14 +598,6 @@
 
 - (void)layoutSubviews {
     %orig;
-
-    UIViewController *vc = [DYYYUtils firstAvailableViewControllerFromView:self];
-
-    if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)]) {
-        if (self.markLabel) {
-            self.markLabel.textColor = [UIColor whiteColor];
-        }
-    }
 
     if (DYYYGetBool(@"DYYYHideLocation")) {
         self.hidden = YES;
@@ -1122,165 +1051,7 @@ static CGFloat rightLabelRightMargin = -1;
         labelColorHex = @"random_gradient";
     }
     if (DYYYGetBool(@"DYYYEnableArea")) {
-        NSString *originalText = label.text ?: @"";
-        NSString *cityCode = self.model.cityCode;
-
-        if (cityCode.length > 0) {
-            NSString *cityName = [CityManager.sharedInstance getCityNameWithCode:cityCode];
-            NSString *provinceName = [CityManager.sharedInstance getProvinceNameWithCode:cityCode];
-            // 使用 GeoNames API
-            if (!cityName || cityName.length == 0) {
-                NSString *cacheKey = cityCode;
-
-                static NSCache *geoNamesCache = nil;
-                static dispatch_once_t onceToken;
-                dispatch_once(&onceToken, ^{
-                  geoNamesCache = [[NSCache alloc] init];
-                  geoNamesCache.name = @"com.dyyy.geonames.cache";
-                  geoNamesCache.countLimit = 1000;
-                });
-
-                NSDictionary *cachedData = [geoNamesCache objectForKey:cacheKey];
-
-                if (!cachedData) {
-                    NSString *cachesDir = [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) firstObject];
-                    NSString *geoNamesCacheDir = [cachesDir stringByAppendingPathComponent:@"DYYYGeoNamesCache"];
-
-                    NSFileManager *fileManager = [NSFileManager defaultManager];
-                    if (![fileManager fileExistsAtPath:geoNamesCacheDir]) {
-                        [fileManager createDirectoryAtPath:geoNamesCacheDir withIntermediateDirectories:YES attributes:nil error:nil];
-                    }
-
-                    NSString *cacheFilePath = [geoNamesCacheDir stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.plist", cacheKey]];
-
-                    if ([fileManager fileExistsAtPath:cacheFilePath]) {
-                        cachedData = [NSDictionary dictionaryWithContentsOfFile:cacheFilePath];
-                        if (cachedData) {
-                            [geoNamesCache setObject:cachedData forKey:cacheKey];
-                        }
-                    }
-                }
-
-                if (cachedData) {
-                    NSString *countryName = cachedData[@"countryName"];
-                    NSString *adminName1 = cachedData[@"adminName1"];
-                    NSString *localName = cachedData[@"name"];
-                    NSString *displayLocation = @"未知";
-
-                    if (countryName.length > 0) {
-                        if (adminName1.length > 0 && localName.length > 0 && ![countryName isEqualToString:@"中国"] && ![countryName isEqualToString:localName]) {
-                            // 国外位置：国家 + 州/省 + 地点
-                            displayLocation = [NSString stringWithFormat:@"%@ %@ %@", countryName, adminName1, localName];
-                        } else if (localName.length > 0 && ![countryName isEqualToString:localName]) {
-                            // 只有国家和地点名
-                            displayLocation = [NSString stringWithFormat:@"%@ %@", countryName, localName];
-                        } else {
-                            // 只有国家名
-                            displayLocation = countryName;
-                        }
-                    } else if (localName.length > 0) {
-                        displayLocation = localName;
-                    }
-
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                      NSString *currentLabelText = label.text ?: @"";
-                      if ([currentLabelText containsString:@"IP属地："]) {
-                          NSRange range = [currentLabelText rangeOfString:@"IP属地："];
-                          if (range.location != NSNotFound) {
-                              NSString *baseText = [currentLabelText substringToIndex:range.location];
-                              if (![currentLabelText containsString:displayLocation]) {
-                                  label.text = [NSString stringWithFormat:@"%@IP属地：%@", baseText, displayLocation];
-                              }
-                          }
-                      } else {
-                          if (currentLabelText.length > 0 && ![displayLocation isEqualToString:@"未知"]) {
-                              label.text = [NSString stringWithFormat:@"%@  IP属地：%@", currentLabelText, displayLocation];
-                          } else if (![displayLocation isEqualToString:@"未知"]) {
-                              label.text = [NSString stringWithFormat:@"IP属地：%@", displayLocation];
-                          }
-                      }
-
-                      [DYYYUtils applyColorSettingsToLabel:label colorHexString:labelColorHex];
-                    });
-                } else {
-                    [CityManager fetchLocationWithGeonameId:cityCode
-                                          completionHandler:^(NSDictionary *locationInfo, NSError *error) {
-                                            if (locationInfo) {
-                                                NSString *countryName = locationInfo[@"countryName"];
-                                                NSString *adminName1 = locationInfo[@"adminName1"]; // 州/省级名称
-                                                NSString *localName = locationInfo[@"name"];        // 当前地点名称
-                                                NSString *displayLocation = @"未知";
-
-                                                // 根据返回数据构建位置显示文本
-                                                if (countryName.length > 0) {
-                                                    if (adminName1.length > 0 && localName.length > 0 && ![countryName isEqualToString:@"中国"] && ![countryName isEqualToString:localName]) {
-                                                        // 国外位置：国家 + 州/省 + 地点
-                                                        displayLocation = [NSString stringWithFormat:@"%@ %@ %@", countryName, adminName1, localName];
-                                                    } else if (localName.length > 0 && ![countryName isEqualToString:localName]) {
-                                                        // 只有国家和地点名
-                                                        displayLocation = [NSString stringWithFormat:@"%@ %@", countryName, localName];
-                                                    } else {
-                                                        // 只有国家名
-                                                        displayLocation = countryName;
-                                                    }
-                                                } else if (localName.length > 0) {
-                                                    displayLocation = localName;
-                                                }
-
-                                                // 修改：仅当位置不为"未知"时才缓存
-                                                if (![displayLocation isEqualToString:@"未知"]) {
-                                                    [geoNamesCache setObject:locationInfo forKey:cacheKey];
-
-                                                    NSString *cachesDir = [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) firstObject];
-                                                    NSString *geoNamesCacheDir = [cachesDir stringByAppendingPathComponent:@"DYYYGeoNamesCache"];
-                                                    NSString *cacheFilePath = [geoNamesCacheDir stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.plist", cacheKey]];
-
-                                                    [locationInfo writeToFile:cacheFilePath atomically:YES];
-                                                }
-
-                                                dispatch_async(dispatch_get_main_queue(), ^{
-                                                  NSString *currentLabelText = label.text ?: @"";
-
-                                                  if ([currentLabelText containsString:@"IP属地："]) {
-                                                      NSRange range = [currentLabelText rangeOfString:@"IP属地："];
-                                                      if (range.location != NSNotFound) {
-                                                          NSString *baseText = [currentLabelText substringToIndex:range.location];
-                                                          if (![currentLabelText containsString:displayLocation]) {
-                                                              label.text = [NSString stringWithFormat:@"%@IP属地：%@", baseText, displayLocation];
-                                                          }
-                                                      }
-                                                  } else {
-                                                      if (currentLabelText.length > 0 && ![displayLocation isEqualToString:@"未知"]) {
-                                                          label.text = [NSString stringWithFormat:@"%@  IP属地：%@", currentLabelText, displayLocation];
-                                                      } else if (![displayLocation isEqualToString:@"未知"]) {
-                                                          label.text = [NSString stringWithFormat:@"IP属地：%@", displayLocation];
-                                                      }
-                                                  }
-
-                                                  [DYYYUtils applyColorSettingsToLabel:label colorHexString:labelColorHex];
-                                                });
-                                            }
-                                          }];
-                }
-            } else if (![originalText containsString:cityName]) {
-                BOOL isDirectCity = [provinceName isEqualToString:cityName] || ([cityCode hasPrefix:@"11"] || [cityCode hasPrefix:@"12"] || [cityCode hasPrefix:@"31"] || [cityCode hasPrefix:@"50"]);
-                if (!self.model.ipAttribution) {
-                    if (isDirectCity) {
-                        label.text = [NSString stringWithFormat:@"%@  IP属地：%@", originalText, cityName];
-                    } else {
-                        label.text = [NSString stringWithFormat:@"%@  IP属地：%@ %@", originalText, provinceName, cityName];
-                    }
-                } else {
-                    BOOL containsProvince = [originalText containsString:provinceName];
-                    BOOL containsCity = [originalText containsString:cityName];
-                    if (containsProvince && !isDirectCity && !containsCity) {
-                        label.text = [NSString stringWithFormat:@"%@ %@", originalText, cityName];
-                    } else if (isDirectCity && !containsCity) {
-                        label.text = [NSString stringWithFormat:@"%@  IP属地：%@", originalText, cityName];
-                    }
-                }
-            }
-        }
+        [DYYYUtils processAndApplyIPLocationToLabel:label forModel:self.model withLabelColor:labelColorHex];
     }
     // 应用IP属地标签上移
     NSString *ipScaleValue = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYNicknameScale"];
@@ -1298,9 +1069,6 @@ static CGFloat rightLabelRightMargin = -1;
 
         label.font = originalFont;
     }
-
-    [DYYYUtils applyColorSettingsToLabel:label colorHexString:labelColorHex];
-
     return label;
 }
 
@@ -2139,67 +1907,6 @@ bool commentLivePhotoNotWaterMark = DYYYGetBool(@"DYYYCommentLivePhotoNotWaterMa
 }
 %end
 
-%hook _TtC33AWECommentLongPressPanelSwiftImpl37CommentLongPressPanelSaveImageElement
-
-static BOOL isDownloadFlied = NO;
-
-- (BOOL)elementShouldShow {
-    BOOL DYYYForceDownloadEmotion = DYYYGetBool(@"DYYYForceDownloadEmotion");
-    if (DYYYForceDownloadEmotion) {
-        AWECommentLongPressPanelContext *commentPageContext = [self commentPageContext];
-        AWECommentModel *selectdComment = [commentPageContext selectdComment];
-        if (!selectdComment) {
-            AWECommentLongPressPanelParam *params = [commentPageContext params];
-            selectdComment = [params selectdComment];
-        }
-        AWEIMStickerModel *sticker = [selectdComment sticker];
-        if (sticker) {
-            AWEURLModel *staticURLModel = [sticker staticURLModel];
-            NSArray *originURLList = [staticURLModel originURLList];
-            if (originURLList.count > 0) {
-                return YES;
-            }
-        }
-    }
-    return %orig;
-}
-
-- (void)elementTapped {
-    BOOL DYYYForceDownloadEmotion = DYYYGetBool(@"DYYYForceDownloadEmotion");
-    if (DYYYForceDownloadEmotion) {
-        AWECommentLongPressPanelContext *commentPageContext = [self commentPageContext];
-        AWECommentModel *selectdComment = [commentPageContext selectdComment];
-        if (!selectdComment) {
-            AWECommentLongPressPanelParam *params = [commentPageContext params];
-            selectdComment = [params selectdComment];
-        }
-        AWEIMStickerModel *sticker = [selectdComment sticker];
-        if (sticker) {
-            AWEURLModel *staticURLModel = [sticker staticURLModel];
-            NSArray *originURLList = [staticURLModel originURLList];
-            if (originURLList.count > 0) {
-                NSString *urlString = @"";
-                if (isDownloadFlied) {
-                    urlString = originURLList[originURLList.count - 1];
-                    isDownloadFlied = NO;
-                } else {
-                    urlString = originURLList[0];
-                }
-
-                NSURL *heifURL = [NSURL URLWithString:urlString];
-                [DYYYManager downloadMedia:heifURL
-                                 mediaType:MediaTypeHeic
-                                     audio:nil
-                                completion:^(BOOL success){
-                                }];
-                return;
-            }
-        }
-    }
-    %orig;
-}
-%end
-
 %group EnableStickerSaveMenu
 static __weak YYAnimatedImageView *targetStickerView = nil;
 
@@ -2591,7 +2298,7 @@ static AWEIMReusableCommonCell *currentCell;
 
 %end
 
-// Swift 类组 - 这些会在 %ctor 中动态初始化
+// Swift 类组
 %group CommentHeaderGeneralGroup
 %hook AWECommentPanelHeaderSwiftImpl_CommentHeaderGeneralView
 - (void)layoutSubviews {
@@ -2635,30 +2342,6 @@ static AWEIMReusableCommonCell *currentCell;
 }
 %end
 %end
-// Swift 类初始化
-%ctor {
-
-    // 动态获取 Swift 类并初始化对应的组
-    Class commentHeaderGeneralClass = objc_getClass("AWECommentPanelHeaderSwiftImpl.CommentHeaderGeneralView");
-    if (commentHeaderGeneralClass) {
-        %init(CommentHeaderGeneralGroup, AWECommentPanelHeaderSwiftImpl_CommentHeaderGeneralView = commentHeaderGeneralClass);
-    }
-
-    Class commentHeaderGoodsClass = objc_getClass("AWECommentPanelHeaderSwiftImpl.CommentHeaderGoodsView");
-    if (commentHeaderGoodsClass) {
-        %init(CommentHeaderGoodsGroup, AWECommentPanelHeaderSwiftImpl_CommentHeaderGoodsView = commentHeaderGoodsClass);
-    }
-
-    Class commentHeaderTemplateClass = objc_getClass("AWECommentPanelHeaderSwiftImpl.CommentHeaderTemplateAnchorView");
-    if (commentHeaderTemplateClass) {
-        %init(CommentHeaderTemplateGroup, AWECommentPanelHeaderSwiftImpl_CommentHeaderTemplateAnchorView = commentHeaderTemplateClass);
-    }
-
-    Class tipsVCClass = objc_getClass("AWECommentPanelListSwiftImpl.CommentBottomTipsContainerViewController");
-    if (tipsVCClass) {
-        %init(CommentBottomTipsVCGroup, AWECommentPanelListSwiftImpl_CommentBottomTipsContainerViewController = tipsVCClass);
-    }
-}
 
 // 去除隐藏大家都在搜后的留白
 %hook AWESearchAnchorListModel
@@ -6355,6 +6038,63 @@ static Class TagViewClass = nil;
 
 %hook AWEElementStackView
 
+- (void)setAlpha:(CGFloat)alpha {
+    // 纯净模式功能
+    static dispatch_source_t timer = nil;
+    static int attempts = 0;
+    static BOOL pureModeSet = NO;
+    if (DYYYGetBool(@"DYYYEnablePure")) {
+        %orig(0.0);
+        if (pureModeSet) {
+            return;
+        }
+        if (!timer) {
+            timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+            dispatch_source_set_timer(timer, DISPATCH_TIME_NOW, 0.5 * NSEC_PER_SEC, 0);
+            dispatch_source_set_event_handler(timer, ^{
+              UIWindow *keyWindow = [DYYYUtils getActiveWindow];
+              if (keyWindow && keyWindow.rootViewController) {
+                  UIViewController *feedVC = [DYYYUtils findViewControllerOfClass:NSClassFromString(@"AWEFeedTableViewController") inViewController:keyWindow.rootViewController];
+                  if (feedVC) {
+                      [feedVC setValue:@YES forKey:@"pureMode"];
+                      pureModeSet = YES;
+                      dispatch_source_cancel(timer);
+                      timer = nil;
+                      attempts = 0;
+                      return;
+                  }
+              }
+              attempts++;
+              if (attempts >= 10) {
+                  dispatch_source_cancel(timer);
+                  timer = nil;
+                  attempts = 0;
+              }
+            });
+            dispatch_resume(timer);
+        }
+        return;
+    } else {
+        if (timer) {
+            dispatch_source_cancel(timer);
+            timer = nil;
+        }
+        attempts = 0;
+        pureModeSet = NO;
+        %orig(alpha);
+    }
+
+    // 倍速和清屏按钮的状态控制
+    if (speedButton && isFloatSpeedButtonEnabled) {
+        if (alpha == 0) {
+        } else if (alpha == 1) {
+            dyyyCommentViewVisible = NO;
+        }
+        updateSpeedButtonVisibility();
+        updateClearButtonVisibility();
+    }
+}
+
 + (void)initialize {
     GuideViewClass = NSClassFromString(@"AWELivePrestreamGuideView");
     MuteViewClass = NSClassFromString(@"AFDCancelMuteAwemeView");
@@ -6373,18 +6113,6 @@ static Class TagViewClass = nil;
     dyyyCommentViewVisible = YES;
     updateSpeedButtonVisibility();
     updateClearButtonVisibility();
-}
-
-- (void)setAlpha:(CGFloat)alpha {
-    %orig;
-    if (speedButton && isFloatSpeedButtonEnabled) {
-        if (alpha == 0) {
-        } else if (alpha == 1) {
-            dyyyCommentViewVisible = NO;
-        }
-        updateSpeedButtonVisibility();
-        updateClearButtonVisibility();
-    }
 }
 
 - (void)layoutSubviews {
@@ -7044,38 +6772,6 @@ static NSString *const kStreamlineSidebarKey = @"DYYYHideSidebarElements";
 
 %end
 
-// Swift 类初始化
-%ctor {
-
-    // 初始化红包激励挂件容器视图类组
-    Class incentivePendantClass = objc_getClass("AWEIncentiveSwiftImplDOUYINLite.IncentivePendantContainerView");
-    if (incentivePendantClass) {
-        %init(IncentivePendantGroup, AWEIncentiveSwiftImplDOUYINLite_IncentivePendantContainerView = incentivePendantClass);
-    }
-    Class imageContentClass = objc_getClass("BDMultiContentContainer.ImageContentView");
-    if (imageContentClass) {
-        %init(BDMultiContentImageViewGroup, BDMultiContentContainer_ImageContentView = imageContentClass);
-    }
-}
-
-%ctor {
-    %init(DYYYSettingsGesture);
-    if (DYYYGetBool(@"DYYYUserAgreementAccepted")) {
-        static dispatch_once_t onceToken;
-        dispatch_once(&onceToken, ^{
-          Class wSwiftImpl = objc_getClass("AWECommentInputViewSwiftImpl.CommentInputContainerView");
-          %init(CommentInputContainerView = wSwiftImpl);
-        });
-        BOOL isAutoPlayEnabled = DYYYGetBool(@"DYYYEnableAutoPlay");
-        if (isAutoPlayEnabled) {
-            %init(AutoPlay);
-        }
-        if (DYYYGetBool(@"DYYYForceDownloadEmotion")) {
-            %init(EnableStickerSaveMenu);
-        }
-    }
-}
-
 // 隐藏键盘 AI
 static __weak UIView *cachedHideView = nil;
 static void hideParentViewsSubviews(UIView *view) {
@@ -7095,6 +6791,7 @@ static void hideParentViewsSubviews(UIView *view) {
         subview.hidden = YES;
     }
 }
+
 // 递归查找目标视图
 static void findTargetViewInView(UIView *view) {
     if (cachedHideView)
@@ -7111,8 +6808,54 @@ static void findTargetViewInView(UIView *view) {
 }
 
 %ctor {
-    // 注册键盘通知
+    %init(DYYYSettingsGesture);
     if (DYYYGetBool(@"DYYYUserAgreementAccepted")) {
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+          Class wSwiftImpl = objc_getClass("AWECommentInputViewSwiftImpl.CommentInputContainerView");
+          %init(CommentInputContainerView = wSwiftImpl);
+        });
+        BOOL isAutoPlayEnabled = DYYYGetBool(@"DYYYEnableAutoPlay");
+        if (isAutoPlayEnabled) {
+            %init(AutoPlay);
+        }
+        if (DYYYGetBool(@"DYYYForceDownloadEmotion")) {
+            %init(EnableStickerSaveMenu);
+        }
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        isFloatSpeedButtonEnabled = [defaults boolForKey:@"DYYYEnableFloatSpeedButton"];
+
+        // 初始化红包激励挂件容器视图类组
+        Class incentivePendantClass = objc_getClass("AWEIncentiveSwiftImplDOUYINLite.IncentivePendantContainerView");
+        if (incentivePendantClass) {
+            %init(IncentivePendantGroup, AWEIncentiveSwiftImplDOUYINLite_IncentivePendantContainerView = incentivePendantClass);
+        }
+        Class imageContentClass = objc_getClass("BDMultiContentContainer.ImageContentView");
+        if (imageContentClass) {
+            %init(BDMultiContentImageViewGroup, BDMultiContentContainer_ImageContentView = imageContentClass);
+        }
+
+        // 动态获取 Swift 类并初始化对应的组
+        Class commentHeaderGeneralClass = objc_getClass("AWECommentPanelHeaderSwiftImpl.CommentHeaderGeneralView");
+        if (commentHeaderGeneralClass) {
+            %init(CommentHeaderGeneralGroup, AWECommentPanelHeaderSwiftImpl_CommentHeaderGeneralView = commentHeaderGeneralClass);
+        }
+
+        Class commentHeaderGoodsClass = objc_getClass("AWECommentPanelHeaderSwiftImpl.CommentHeaderGoodsView");
+        if (commentHeaderGoodsClass) {
+            %init(CommentHeaderGoodsGroup, AWECommentPanelHeaderSwiftImpl_CommentHeaderGoodsView = commentHeaderGoodsClass);
+        }
+
+        Class commentHeaderTemplateClass = objc_getClass("AWECommentPanelHeaderSwiftImpl.CommentHeaderTemplateAnchorView");
+        if (commentHeaderTemplateClass) {
+            %init(CommentHeaderTemplateGroup, AWECommentPanelHeaderSwiftImpl_CommentHeaderTemplateAnchorView = commentHeaderTemplateClass);
+        }
+
+        Class tipsVCClass = objc_getClass("AWECommentPanelListSwiftImpl.CommentBottomTipsContainerViewController");
+        if (tipsVCClass) {
+            %init(CommentBottomTipsVCGroup, AWECommentPanelListSwiftImpl_CommentBottomTipsContainerViewController = tipsVCClass);
+        }
+
         [[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardWillShowNotification
                                                           object:nil
                                                            queue:[NSOperationQueue mainQueue]
@@ -7132,10 +6875,4 @@ static void findTargetViewInView(UIView *view) {
                                                         }
                                                       }];
     }
-}
-
-%ctor {
-    signal(SIGSEGV, SIG_IGN);
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    isFloatSpeedButtonEnabled = [defaults boolForKey:@"DYYYEnableFloatSpeedButton"];
 }
