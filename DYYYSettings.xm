@@ -16,7 +16,6 @@
 #import "DYYYConstants.h"
 #import "DYYYSettingsHelper.h"
 #import "DYYYUtils.h"
-#import "DYYYLifecycleSafety.h"
 
 @class DYYYIconOptionsDialogView;
 static void showIconOptionsDialog(NSString *title, UIImage *previewImage, NSString *saveFilename, void (^onClear)(void), void (^onSelect)(void));
@@ -37,7 +36,6 @@ static id dyyyRemoteConfigChangedToken = nil;
 static void DYYYRemoveRemoteConfigObserver(void) {
     if (dyyyRemoteConfigChangedToken) {
         [[NSNotificationCenter defaultCenter] removeObserver:dyyyRemoteConfigChangedToken];
-        DYYYDebugLog("Removed remote config observer");
         dyyyRemoteConfigChangedToken = nil;
     }
 }
@@ -526,7 +524,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
             @"detail" : @"",
             @"cellType" : @6,
             @"imageName" : @"ic_ad_outlined_20"},
-          @{@"identifier" : @"DYYYHideteenmode",
+          @{@"identifier" : @"DYYYHideTeenMode",
             @"title" : @"移除青少年弹窗",
             @"detail" : @"",
             @"cellType" : @6,
