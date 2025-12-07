@@ -4488,12 +4488,15 @@ static BOOL DYYYIsLandscapeVideoBounds(CGSize size) {
     if (!DYYYGetBool(@"DYYYEnableFullScreen")) {
         return;
     }
-    if (!DYYYIsLandscapeVideoBounds(self.bounds.size)) {
+    BOOL shouldAdjust = DYYYIsLandscapeVideoBounds(self.bounds.size);
+    if (!shouldAdjust) {
         return;
     }
 
     CGFloat viewWidth = CGRectGetWidth(self.bounds);
-    CGFloat screenWidth = [UIScreen mainScreen].bounds.size.width;
+    CGRect screenBounds = [UIScreen mainScreen].bounds;
+    CGFloat screenWidth = CGRectGetWidth(screenBounds);
+    BOOL isScreenLandscape = screenWidth > CGRectGetHeight(screenBounds);
 
     if (viewWidth < screenWidth) {
         return;
@@ -4504,7 +4507,7 @@ static BOOL DYYYIsLandscapeVideoBounds(CGSize size) {
         return;
     }
 
-    CGFloat desiredOffset = tabHeight * 0.6f;
+    CGFloat desiredOffset = isScreenLandscape ? 0.0f : (tabHeight * 0.6f);
     CGFloat appliedOffset = storedValue ? storedValue.doubleValue : 0.0f;
     CGFloat delta = desiredOffset - appliedOffset;
     if (fabs(delta) < 0.1f) {
@@ -4553,15 +4556,6 @@ static BOOL DYYYIsLandscapeVideoBounds(CGSize size) {
     return %orig;
 }
 
-%end
-
-// 去广告功能
-%hook AwemeAdManager
-- (void)showAd {
-    if (DYYYGetBool(@"DYYYNoAds"))
-        return;
-    %orig;
-}
 %end
 
 %hook AWEPlayInteractionUserAvatarView
@@ -6040,7 +6034,7 @@ static void *DYYYTabBarHeightContext = &DYYYTabBarHeightContext;
 
     NSString *currentReferString = self.referString;
 
-    BOOL useFullHeight = [currentReferString isEqualToString:@"general_search"] || [currentReferString isEqualToString:@"search_result"] ||
+    BOOL useFullHeight = [currentReferString isEqualToString:@"general_search"] || [currentReferString isEqualToString:@"search_result"] || [currentReferString isEqualToString:@"search_ecommerce"] ||
                          [currentReferString isEqualToString:@"close_friends_moment"] || [currentReferString isEqualToString:@"offline_mode"] || [currentReferString isEqualToString:@"challenge"] ||
                          [currentReferString isEqualToString:@"general_search_scan"] || currentReferString == nil;
 
@@ -6474,6 +6468,7 @@ static void DYYYRemoveKeyboardObserver(void) {
 
         hideButton.hidden = NO;
         [getKeyWindow() addSubview:hideButton];
+        updateClearButtonVisibility();
 
         DYYYRemoveAppLifecycleObservers();
 
@@ -6597,10 +6592,12 @@ static Class TagViewClass = nil;
     pureModeSet = NO;
 
     // 倍速和清屏按钮的状态控制
-    if (speedButton && isFloatSpeedButtonEnabled) {
-        if (alpha == 0) {
+    BOOL hasFloatingButtons = (speedButton && isFloatSpeedButtonEnabled) || hideButton;
+    if (hasFloatingButtons && !dyyyIsPerformingFloatClearOperation) {
+        const CGFloat threshold = 0.01f;
+        if (alpha <= threshold) {
             dyyyCommentViewVisible = YES;
-        } else if (alpha == 1) {
+        } else if (alpha >= (1.0f - threshold)) {
             dyyyCommentViewVisible = NO;
         }
         updateSpeedButtonVisibility();
@@ -7001,12 +6998,16 @@ static Class TagViewClass = nil;
 - (void)setFrame:(CGRect)frame {
 
     CGFloat viewWidth = CGRectGetWidth(self.bounds);
-    CGFloat screenWidth = [UIScreen mainScreen].bounds.size.width;
+    CGRect screenBounds = [UIScreen mainScreen].bounds;
+    CGFloat screenWidth = CGRectGetWidth(screenBounds);
+    BOOL isScreenLandscape = screenWidth > CGRectGetHeight(screenBounds);
 
     if (viewWidth < screenWidth) {
         %orig(frame);
     } else if (DYYYGetBool(@"DYYYEnableFullScreen") && gCurrentTabBarHeight > 0.0f) {
-        frame.size.height += 25.0f;
+        if (!isScreenLandscape) {
+            frame.size.height += 25.0f;
+        }
     }
     %orig(frame);
 }
@@ -7019,8 +7020,14 @@ static Class TagViewClass = nil;
     if (DYYYGetBool(@"DYYYEnableFullScreen")) {
         UIViewController *vc = [DYYYUtils firstAvailableViewControllerFromView:self];
         Class pureModeVC = NSClassFromString(@"AWEFeedPlayControlImpl.PureModePageCellViewController");
-        if (vc && pureModeVC && [vc isKindOfClass:pureModeVC]) {
+        BOOL inPureMode = (vc && pureModeVC && [vc isKindOfClass:pureModeVC]);
+        if (inPureMode) {
             center.y += gCurrentTabBarHeight * 0.5;
+        } else {
+            CGFloat screenHeight = [UIScreen mainScreen].bounds.size.height;
+            if (center.y > screenHeight * 0.6) {
+                center.y += gCurrentTabBarHeight * 0.5;
+            }
         }
     }
 
@@ -7410,7 +7417,9 @@ static void findTargetViewInView(UIView *view) {
 }
 
 %ctor {
-    %init(DYYYSettingsGesture);
+    if (!DYYYGetBool(@"DYYYDisableSettingsGesture")) {
+        %init(DYYYSettingsGesture);
+    }
     if (DYYYGetBool(@"DYYYUserAgreementAccepted")) {
         static dispatch_once_t onceToken;
         dispatch_once(&onceToken, ^{
